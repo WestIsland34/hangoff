@@ -232,8 +232,18 @@ const f32 = v => { const b = new DataView(new ArrayBuffer(4)); b.setFloat32(0, v
 
 // GATT 操作は同時に1つしかできないので、順番に実行する。
 // 同じ項目の書き込みが溜まったら最新の値だけ送る。
+// 応答が返らない操作があっても後ろが止まらないよう、1つの操作は最大 5 秒で打ち切る。
 let queue = Promise.resolve();
 const pending = new Map();
+const OP_TIMEOUT_MS = 5000;
+
+function withTimeout(promise) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('本体から応答がありません')), OP_TIMEOUT_MS)),
+  ]);
+}
+
 function enqueueWrite(key, fn) {
   const already = pending.has(key);
   pending.set(key, fn);
@@ -241,8 +251,14 @@ function enqueueWrite(key, fn) {
   queue = queue.then(() => {
     const job = pending.get(key);
     pending.delete(key);
-    return job();
+    if (!job) return;
+    return withTimeout(job());
   }).catch(err => { console.error(err); setStatus('書き込み失敗: ' + err.message, 'err'); });
+}
+
+function resetQueue() {
+  pending.clear();
+  queue = Promise.resolve();
 }
 
 function showValue(p, v) {
@@ -347,6 +363,7 @@ async function connect(dev) {
 }
 
 async function onDisconnected() {
+  resetQueue();
   setEnabled(false);
   $('connect').textContent = '接続';
   $('board').textContent = '--';
@@ -450,6 +467,7 @@ async function save() {
     showToast(written ? '保存結果を確認できませんでした' : '本体に届きませんでした。接続を確認してください', 'ng');
   }
 
+  // 結果表示のあと元に戻す (切断中なら再接続時に有効になる)
   setTimeout(() => {
     setSaveButton('本体に保存');
     btn.disabled = !(device && device.gatt.connected);

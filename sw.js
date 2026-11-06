@@ -1,6 +1,6 @@
 // オフライン(サーキットなど電波のない場所)でも設定画面を開けるようにキャッシュする。
 // キャッシュから即表示し、通信できるときは裏で最新版に更新する。
-const CACHE = 'hangoff-v2';
+const CACHE = 'hangoff-v3';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
