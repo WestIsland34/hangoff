@@ -87,6 +87,23 @@
   .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .actions .wide { grid-column: 1 / -1; }
   .note { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+  button.ok { background: var(--ok); border-color: var(--ok); color: #fff; opacity: 1; }
+  button.ng { background: var(--ng); border-color: var(--ng); color: #fff; opacity: 1; }
+  .dirty { font-size: 13px; font-weight: 600; color: var(--accent); text-align: center; margin: 0 0 10px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px;
+    transform: translate(-50%, 20px);
+    max-width: calc(100% - 32px);
+    padding: 12px 18px; border-radius: 10px;
+    background: var(--text); color: var(--bg);
+    font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast.ok { background: var(--ok); color: #fff; }
+  .toast.ng { background: var(--ng); color: #fff; }
 </style>
 </head>
 <body>
@@ -151,6 +168,7 @@
   </div>
 
   <div class="card">
+    <p id="dirty" class="dirty" hidden>● 未保存の変更があります</p>
     <div class="actions">
       <button id="level">今の傾きを水平にする</button>
       <button id="defaults">初期値に戻す</button>
@@ -159,6 +177,7 @@
     <p class="note">変更はすぐ反映されますが、「本体に保存」を押さないと電源を切ったときに元に戻ります。</p>
   </div>
 </main>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
 // UUID は HangOff.ino と同じにすること
@@ -176,7 +195,9 @@ const PARAMS = [
 ];
 const STATUS_UUID  = uuid('0010');
 const COMMAND_UUID = uuid('0020');
+const RESULT_UUID  = uuid('0021');
 const CMD = { save: 1, level: 2, defaults: 3 };
+const RESULT = { saveOk: 1, saveFail: 2 };
 
 const $ = id => document.getElementById(id);
 let device = null;
@@ -192,6 +213,20 @@ function setEnabled(on) {
   document.querySelectorAll('#params input, .actions button').forEach(el => el.disabled = !on);
 }
 setEnabled(false);
+
+let toastTimer = null;
+function showToast(text, cls = '') {
+  const el = $('toast');
+  el.textContent = text;
+  el.className = 'toast show ' + cls;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = 'toast ' + cls, 2500);
+}
+
+// 本体に保存していない変更があるか
+function setDirty(on) {
+  $('dirty').hidden = !on;
+}
 
 const f32 = v => { const b = new DataView(new ArrayBuffer(4)); b.setFloat32(0, v, true); return b.buffer; };
 
@@ -290,6 +325,12 @@ async function connect(dev) {
     for (const p of PARAMS) chars[p.id] = await service.getCharacteristic(p.uuid);
     chars.command = await service.getCharacteristic(COMMAND_UUID);
     chars.status  = await service.getCharacteristic(STATUS_UUID);
+    // 保存結果の通知 (古いファームウェアには無い)
+    try {
+      chars.result = await service.getCharacteristic(RESULT_UUID);
+      chars.result.addEventListener('characteristicvaluechanged', onResult);
+      await chars.result.startNotifications();
+    } catch { chars.result = null; }
 
     await readAll();
     chars.status.addEventListener('characteristicvaluechanged', onStatus);
@@ -338,28 +379,84 @@ for (const p of PARAMS) {
     input.addEventListener('input', () => {
       const v = parseFloat(input.value);
       $(p.id + 'Val').textContent = p.fmt(v);
+      setDirty(true);
       enqueueWrite(p.id, () => chars[p.id].writeValueWithResponse(f32(v)));
     });
   } else {
     input.addEventListener('change', () => {
+      setDirty(true);
       enqueueWrite(p.id, () => chars[p.id].writeValueWithResponse(f32(input.checked ? 1 : 0)));
     });
   }
 }
 
-async function sendCommand(cmd, doneText) {
+// 水平記憶・初期値に戻す (本体側で値が変わるので読み直す)
+function sendCommand(cmd, doneText) {
   enqueueWrite('cmd' + cmd, async () => {
     await chars.command.writeValueWithResponse(new Uint8Array([cmd]));
-    if (cmd !== CMD.save) await readAll();   // 本体側で変わった値を読み直す
-    setStatus(doneText, 'on');
+    await readAll();
+    setDirty(true);
+    showToast(doneText);
   });
 }
 
-$('level').addEventListener('click', () => sendCommand(CMD.level, '今の傾きを水平にしました（保存はまだです）'));
+$('level').addEventListener('click', () => sendCommand(CMD.level, '今の傾きを水平にしました'));
 $('defaults').addEventListener('click', () => {
-  if (confirm('設定を初期値に戻しますか？')) sendCommand(CMD.defaults, '初期値に戻しました（保存はまだです）');
+  if (confirm('設定を初期値に戻しますか？')) sendCommand(CMD.defaults, '初期値に戻しました');
 });
-$('save').addEventListener('click', () => sendCommand(CMD.save, '本体に保存しました'));
+
+// ---- 保存 ----
+let saveResolve = null;
+
+function onResult(e) {
+  const r = e.target.value.getUint8(0);
+  if (saveResolve) { saveResolve(r); saveResolve = null; }
+}
+
+function setSaveButton(text, cls) {
+  const btn = $('save');
+  btn.textContent = text;
+  btn.classList.remove('ok', 'ng');
+  if (cls) btn.classList.add(cls);
+}
+
+async function save() {
+  const btn = $('save');
+  btn.disabled = true;
+  setSaveButton('保存中…');
+
+  // 本体からの結果通知を待つ (結果通知が無い古いファームウェアなら書き込み完了で成功とみなす)
+  const result = new Promise(resolve => {
+    saveResolve = resolve;
+    setTimeout(() => { if (saveResolve === resolve) { saveResolve = null; resolve('timeout'); } }, 5000);
+  });
+  let written = false;
+  enqueueWrite('save', async () => {
+    await chars.command.writeValueWithResponse(new Uint8Array([CMD.save]));
+    written = true;
+    if (!chars.result && saveResolve) { saveResolve(RESULT.saveOk); saveResolve = null; }
+  });
+
+  const r = await result;
+  if (r === RESULT.saveOk) {
+    setDirty(false);
+    setSaveButton('✓ 保存しました', 'ok');
+    showToast('✓ 本体に保存しました', 'ok');
+  } else if (r === RESULT.saveFail) {
+    setSaveButton('✕ 保存に失敗しました', 'ng');
+    showToast('保存に失敗しました。もう一度押してください', 'ng');
+  } else {
+    setSaveButton('? 確認できませんでした', 'ng');
+    showToast(written ? '保存結果を確認できませんでした' : '本体に届きませんでした。接続を確認してください', 'ng');
+  }
+
+  setTimeout(() => {
+    setSaveButton('本体に保存');
+    btn.disabled = !(device && device.gatt.connected);
+  }, 2000);
+}
+
+$('save').addEventListener('click', save);
 </script>
 </body>
 </html>
