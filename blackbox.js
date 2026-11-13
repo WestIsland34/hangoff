@@ -11,8 +11,8 @@ const LOG_MAGIC = 0x31474C48;   // "HLG1"
 const LOG_HEADER_SIZE = 64;
 const LOG_SAMPLE_SIZE = 12;
 const LOGCMD = { start: 1, stop: 2, read: 3, cancel: 4, probe: 5 };
-const LOG_STATE = { idle: 0, saving: 1, recording: 2, sending: 3, disabled: 4 };
-const STATE_TEXT = ['待機中', '保存中', '● 記録中', '送信中', '使用不可'];
+const LOG_STATE = { idle: 0, flushing: 1, recording: 2, sending: 3, disabled: 4 };
+const STATE_TEXT = ['待機中', '書き込み中', '● 記録中', '送信中', '使用不可'];
 
 const bb = {
   status: null,       // 本体の記録状態
@@ -59,7 +59,7 @@ function bbUpdateUI() {
     $('bbBar').classList.toggle('rec', st.state === LOG_STATE.recording);
     $('bbDroppedWrap').hidden = !st.dropped;
     $('bbDropped').textContent = st.dropped;
-    if (st.state === LOG_STATE.disabled) $('bbNote').textContent = 'プログラムが大きくなり記録場所が足りません。';
+    if (st.state === LOG_STATE.disabled) $('bbNote').textContent = '記録用のフラッシュが見つかりません（シリアルモニタの External flash ID を確認してください）。';
   }
 
   const state = st ? st.state : -1;
@@ -81,11 +81,15 @@ function parseStatus(dv) {
   };
 }
 
+function onLogStatus() {
+  bbUpdateUI();
+}
+
 // app.js から呼ばれる
 async function bbOnConnected() {
   bb.status = null;
   if (chars.logStatus) {
-    chars.logStatus.addEventListener('characteristicvaluechanged', e => { bb.status = parseStatus(e.target.value); bbUpdateUI(); });
+    chars.logStatus.addEventListener('characteristicvaluechanged', e => { bb.status = parseStatus(e.target.value); onLogStatus(); });
     await chars.logStatus.startNotifications();
     bb.status = parseStatus(await chars.logStatus.readValue());
   }
@@ -134,11 +138,9 @@ $('bbStart').addEventListener('click', async () => {
 
 $('bbStop').addEventListener('click', async () => {
   try {
-    // 本体は記録をフラッシュに書き出すために、いったん切断して数秒止まる
-    expectDisconnect(20000);
     await logCommand([LOGCMD.stop]);
-    showToast('記録を本体に保存中です。いったん切断されます（数秒）');
-  } catch (e) { reconnectUntil = 0; showToast('止められませんでした', 'ng'); }
+    showToast('記録を止めました');
+  } catch (e) { showToast('止められませんでした', 'ng'); }
 });
 
 // ---------------------------------------------------------------------

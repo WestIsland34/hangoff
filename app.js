@@ -5,7 +5,7 @@
 // =====================================================================
 
 // 画面の版。ファイルを変えたら上げる (sw.js の CACHE も合わせて上げる)
-const APP_VERSION = '2.0';
+const APP_VERSION = '2.2';
 
 const uuid = n => `a7c3${n}-5b1e-4d6a-9f2e-3c8b1d0e7a51`;
 const SERVICE = uuid('0000');
@@ -216,7 +216,11 @@ async function connect(dev) {
   }
   try {
     setStatus('接続中…');
-    const server = await device.gatt.connect();
+    // 本体が電波を止めているとき、ブラウザによっては接続がいつまでも終わらないので 10 秒で打ち切る
+    const server = await Promise.race([
+      device.gatt.connect(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('接続がタイムアウトしました')), 10000)),
+    ]);
     const service = await server.getPrimaryService(SERVICE);
     for (const p of PARAMS) {
       chars[p.id] = p.optional ? await getOptional(service, p.uuid) : await service.getCharacteristic(p.uuid);
@@ -250,12 +254,15 @@ async function connect(dev) {
     $('connect').textContent = '切断';
   } catch (err) {
     console.error(err);
-    if (device.gatt.connected) device.gatt.disconnect();
+    device.gatt.disconnect();   // 途中の接続も取り消す
     throw err;
   }
 }
 
+let reconnecting = false;
+
 async function onDisconnected() {
+  if (reconnecting) return;   // 再接続の試行中に起きた切断は、今の再接続ループに任せる
   resetQueue();
   setEnabled(false);
   $('connect').textContent = '接続';
@@ -266,10 +273,15 @@ async function onDisconnected() {
 
   // 保存時や電波が弱くて切れたときは自動で再接続する
   const planned = Date.now() < reconnectUntil;
-  for (let i = 1; i <= 5 || Date.now() < reconnectUntil; i++) {
-    setStatus(planned ? '本体が記録の準備中です。終わったら自動で再接続します…' : `切断されました。再接続しています…（${i}/5）`);
-    await new Promise(r => setTimeout(r, 1000));
-    try { await connect(device); reconnectUntil = 0; return; } catch {}
+  reconnecting = true;
+  try {
+    for (let i = 1; i <= 5 || Date.now() < reconnectUntil; i++) {
+      setStatus(planned ? '本体がメモリに保存中です。終わったら自動で再接続します…' : `切断されました。再接続しています…（${i}/5）`);
+      await new Promise(r => setTimeout(r, 1000));
+      try { await connect(device); reconnectUntil = 0; return; } catch {}
+    }
+  } finally {
+    reconnecting = false;
   }
   reconnectUntil = 0;
   setStatus('切断されました。「接続」を押してください', 'err');
