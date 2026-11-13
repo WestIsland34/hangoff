@@ -5,7 +5,7 @@
 // =====================================================================
 
 // 画面の版。ファイルを変えたら上げる (sw.js の CACHE も合わせて上げる)
-const APP_VERSION = '2.2';
+const APP_VERSION = '2.3';
 
 const uuid = n => `a7c3${n}-5b1e-4d6a-9f2e-3c8b1d0e7a51`;
 const SERVICE = uuid('0000');

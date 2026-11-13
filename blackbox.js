@@ -33,6 +33,9 @@ const fmtTime = s => {
   s = Math.max(0, Math.floor(s));
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 };
+const pad2 = n => String(n).padStart(2, '0');
+const fmtDateTime = d =>
+  `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 const fmtKB = b => b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 / 1024).toFixed(2)} MB`;
 
 function bbUpdateUI() {
@@ -59,6 +62,8 @@ function bbUpdateUI() {
     $('bbBar').classList.toggle('rec', st.state === LOG_STATE.recording);
     $('bbDroppedWrap').hidden = !st.dropped;
     $('bbDropped').textContent = st.dropped;
+    $('bbStartedWrap').hidden = !(st.startTime && st.bytes > LOG_HEADER_SIZE);
+    if (st.startTime) $('bbStarted').textContent = fmtDateTime(new Date(st.startTime * 1000));
     if (st.state === LOG_STATE.disabled) $('bbNote').textContent = '記録用のフラッシュが見つかりません（シリアルモニタの External flash ID を確認してください）。';
   }
 
@@ -78,6 +83,7 @@ function parseStatus(dv) {
     bytes: dv.getUint32(4, true),
     capacity: dv.getUint32(8, true),
     dropped: dv.getUint32(12, true),
+    startTime: dv.byteLength >= 20 ? dv.getUint32(16, true) : 0,   // 記録開始の日時 (UNIX 秒)
   };
 }
 
@@ -131,7 +137,11 @@ $('bbStart').addEventListener('click', async () => {
   if (st && st.bytes > LOG_HEADER_SIZE &&
       !confirm('本体に前の記録が残っています。新しく記録すると上書きされます。始めますか？\n（必要なら先に「本体からデータを読み込む」で取り出してください）')) return;
   try {
-    await logCommand([LOGCMD.start]);
+    // 本体には時計が無いので、記録開始の日時をブラウザから送ってヘッダに残してもらう
+    const cmd = new DataView(new ArrayBuffer(5));
+    cmd.setUint8(0, LOGCMD.start);
+    cmd.setUint32(1, Math.floor(Date.now() / 1000), true);
+    await logCommand(new Uint8Array(cmd.buffer));
     showToast('記録を始めました');
   } catch (e) { showToast('記録を始められませんでした', 'ng'); }
 });
@@ -283,13 +293,18 @@ function download(blob, name) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 
-function stamp() {
-  const d = new Date(), p = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+// ファイル名に使う日時: 記録開始の日時 (分からない古い記録やデモは今の日時)
+function logDate() {
+  const t = bb.log && bb.log.meta.startTime;
+  return t ? new Date(t * 1000) : new Date();
+}
+
+function stamp(d) {
+  return `${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`;
 }
 
 $('bbSave').addEventListener('click', () => {
-  if (bb.raw) download(new Blob([bb.raw], { type: 'application/octet-stream' }), `hangoff-${stamp()}.bin`);
+  if (bb.raw) download(new Blob([bb.raw], { type: 'application/octet-stream' }), `hangoff-${stamp(logDate())}.bin`);
 });
 
 $('bbOpen').addEventListener('click', () => $('bbFile').click());
@@ -307,9 +322,12 @@ $('bbFile').addEventListener('change', async e => {
 $('bbCsv').addEventListener('click', () => {
   const A = bb.A;
   if (!A) return;
-  const rows = ['time_s,gyro_x_dps,gyro_y_dps,gyro_z_dps,acc_x_g,acc_y_g,acc_z_g,lean_deg,pitch_deg,rider_deg,g_long,g_lat,g_vert,g_total'];
+  const t0 = A.meta.startTime ? A.meta.startTime * 1000 : 0;
+  const clock = ms => { const d = new Date(ms); return `${fmtDateTime(d)}.${pad2(Math.floor(d.getMilliseconds() / 10))}`; };
+  const rows = ['datetime,time_s,gyro_x_dps,gyro_y_dps,gyro_z_dps,acc_x_g,acc_y_g,acc_z_g,lean_deg,pitch_deg,rider_deg,g_long,g_lat,g_vert,g_total'];
   for (let k = 0; k < A.n; k++) {
     rows.push([
+      t0 ? clock(t0 + k * 1000 / A.rate) : '',
       (k / A.rate).toFixed(2),
       A.gx[k].toFixed(2), A.gy[k].toFixed(2), A.gz[k].toFixed(2),
       A.ax[k].toFixed(4), A.ay[k].toFixed(4), A.az[k].toFixed(4),
@@ -317,7 +335,7 @@ $('bbCsv').addEventListener('click', () => {
       A.gLong[k].toFixed(3), A.gLat[k].toFixed(3), A.gVert[k].toFixed(3), A.gTotal[k].toFixed(3),
     ].join(','));
   }
-  download(new Blob([rows.join('\n')], { type: 'text/csv' }), `hangoff-${stamp()}.csv`);
+  download(new Blob([rows.join('\n')], { type: 'text/csv' }), `hangoff-${stamp(logDate())}.csv`);
 });
 
 $('bbDemo').addEventListener('click', () => {
@@ -362,8 +380,9 @@ function loadBuffer(buf, source, remember) {
 function showLog() {
   bb.A = analyzeLog(bb.log, { flipForward: bb.flip });
   const L = bb.log;
+  const started = L.meta.startTime ? `記録開始 ${fmtDateTime(new Date(L.meta.startTime * 1000))}・` : '';
   $('bbDataInfo').textContent =
-    `${bb.source}: ${(L.n / L.rate).toFixed(1)} 秒・${L.n.toLocaleString()} サンプル・${fmtKB(bb.raw.byteLength)}（記録時の軸 ${'XYZ'[L.meta.axis] || '?'}）`;
+    `${bb.source}: ${started}${(L.n / L.rate).toFixed(1)} 秒・${L.n.toLocaleString()} サンプル・${fmtKB(bb.raw.byteLength)}（記録時の軸 ${'XYZ'[L.meta.axis] || '?'}）`;
   $('viewer').hidden = false;
   if (!viewer) viewer = new Viewer();
   viewer.setData(bb.A);
@@ -389,6 +408,7 @@ function parseLog(buf) {
     ratio: f(40),
     limitDeg: f(44),
     reverse: f(48),
+    startTime: dv.getUint32(52, true),   // 記録開始の日時 (UNIX 秒)。0 は不明
   };
   const n = Math.floor((buf.byteLength - LOG_HEADER_SIZE) / LOG_SAMPLE_SIZE);
   const ch = () => new Float32Array(n);
@@ -529,6 +549,7 @@ function makeDemoLog(seconds = 60, rate = 100) {
   dv.setFloat32(36, 0.96, true);
   dv.setFloat32(40, 1.3, true);    // 比率
   dv.setFloat32(44, 60, true);     // 最大傾き
+  dv.setUint32(52, Math.floor(Date.now() / 1000) - seconds, true);   // 記録開始の日時
 
   // コース: 直線で加速 → ブレーキ → 右コーナー → … (左コーナーも混ぜる)
   const plan = [
