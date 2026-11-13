@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HangOff 設定</title>
+<title>HangOff</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -19,6 +19,10 @@
     --accent-text: #ffffff;
     --ok: #2f9e44;
     --ng: #c92a2a;
+    /* グラフの系列色 */
+    --s1: #d6336c;
+    --s2: #2f9e44;
+    --s3: #1c7ed6;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -31,6 +35,9 @@
       --accent-text: #15171c;
       --ok: #51cf66;
       --ng: #ff6b6b;
+      --s1: #f06595;
+      --s2: #51cf66;
+      --s3: #4dabf7;
     }
   }
   * { box-sizing: border-box; }
@@ -42,7 +49,10 @@
     line-height: 1.5;
   }
   main { max-width: 520px; margin: 0 auto; padding: 16px; }
+  body.wide main { max-width: 960px; }
   h1 { font-size: 20px; margin: 4px 0 12px; }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  [hidden] { display: none !important; }
   .card {
     background: var(--card);
     border: 1px solid var(--line);
@@ -66,7 +76,21 @@
   .status { font-size: 14px; color: var(--muted); }
   .status.on { color: var(--ok); }
   .status.err { color: var(--ng); }
+  .note { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
 
+  /* ---- モード選択 ---- */
+  .home { display: grid; gap: 12px; }
+  .home button {
+    text-align: left; padding: 18px; border-radius: 12px;
+    display: grid; gap: 4px;
+  }
+  .home button b { font-size: 18px; }
+  .home button span { font-size: 13px; color: var(--muted); }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+  .modes button { padding: 8px; font-weight: 600; }
+  .modes button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+
+  /* ---- 角度調整 ---- */
   .live { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; }
   .live .val { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .live .lbl { font-size: 12px; color: var(--muted); }
@@ -118,10 +142,53 @@
 
   .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .actions .wide { grid-column: 1 / -1; }
-  .note { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
   button.ok { background: var(--ok); border-color: var(--ok); color: #fff; opacity: 1; }
   button.ng { background: var(--ng); border-color: var(--ng); color: #fff; opacity: 1; }
   .dirty { font-size: 13px; font-weight: 600; color: var(--accent); text-align: center; margin: 0 0 10px; }
+
+  /* ---- ブラックボックス ---- */
+  .bb-top { display: grid; gap: 12px; }
+  @media (min-width: 760px) { .bb-top { grid-template-columns: 1fr 1fr; } .bb-top .card { margin-bottom: 0; } .bb-top + * { margin-top: 12px; } }
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 13px; font-weight: 700; background: var(--line); color: var(--text);
+  }
+  .badge.rec { background: var(--ng); color: #fff; }
+  .badge.busy { background: var(--accent); color: var(--accent-text); }
+  .big-time { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 6px 0 2px; }
+  .big-time small { font-size: 15px; color: var(--muted); font-weight: 600; }
+  .bar { height: 10px; background: var(--line); border-radius: 999px; overflow: hidden; margin: 8px 0; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .bar.rec > div { background: var(--ng); }
+  .kv { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .btns .wide { grid-column: 1 / -1; }
+
+  .vtabs { display: flex; gap: 6px; overflow-x: auto; margin: 0 -4px 10px; padding: 0 4px 2px; }
+  .vtabs button { white-space: nowrap; padding: 7px 12px; font-size: 14px; }
+  .vtabs button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  .stage { position: relative; }
+  #vCanvas {
+    display: block; width: 100%;
+    height: min(62vh, 520px); min-height: 300px;
+    background: var(--bg); border-radius: 10px;
+    touch-action: none; cursor: grab;
+  }
+  .cams { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .cams button { padding: 5px 10px; font-size: 13px; }
+  .timeline { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .timeline input[type=range] { flex: 1; margin: 0; }
+  .timeline .t { font-variant-numeric: tabular-nums; font-size: 13px; min-width: 92px; text-align: right; }
+  .timeline select, .opts select { font: inherit; padding: 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  #vPlay { width: 46px; padding: 8px 0; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; font-size: 14px; }
+  .opts label { display: inline-flex; align-items: center; gap: 6px; }
+  .readouts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+  @media (max-width: 480px) { .readouts { grid-template-columns: repeat(2, 1fr); } }
+  .readouts div { background: var(--bg); border-radius: 8px; padding: 6px 8px; }
+  .readouts b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .readouts span { font-size: 11px; color: var(--muted); }
+  .vhelp { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
 
   .toast {
     position: fixed; left: 50%; bottom: 24px;
@@ -132,6 +199,7 @@
     font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.25);
     opacity: 0; pointer-events: none;
     transition: opacity .2s, transform .2s;
+    z-index: 10;
   }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
   .toast.ok { background: var(--ok); color: #fff; }
@@ -140,7 +208,7 @@
 </head>
 <body>
 <main>
-  <h1>HangOff 設定</h1>
+  <h1>HangOff</h1>
 
   <div class="card row">
     <div class="grow">
@@ -149,400 +217,187 @@
     <button id="connect" class="primary">接続</button>
   </div>
 
-  <div class="card">
-    <div class="live">
-      <div><div class="val" id="board">--</div><div class="lbl">ボードの傾き</div></div>
-      <div><div class="val" id="servo">--</div><div class="lbl">サーボ出力</div></div>
-    </div>
-    <!-- サーボ角に合わせてライダーが傾く -->
-    <div class="rider" aria-hidden="true">
-      <img id="riderImg" src="rider.webp" alt="">
-    </div>
-  </div>
+  <!-- ===== モード選択 (起動直後) ===== -->
+  <section id="home" class="home">
+    <button data-mode="tune">
+      <b>角度調整モード</b>
+      <span>ボードの傾きとライダーの傾きの比率などを調整して、本体に保存します</span>
+    </button>
+    <button data-mode="blackbox">
+      <b>ブラックボックスモード</b>
+      <span>ジャイロと加速度を記録して、走行中の傾きやGを3Dで振り返ります</span>
+    </button>
+  </section>
 
-  <div class="card" id="params">
-    <div class="param" id="axisRow">
-      <div class="head"><span class="name">傾きを測る軸</span><span class="num" id="axisVal">-</span></div>
-      <div class="hint">ボードを傾けても「ボードの傾き」が変わらないときは、別の軸を選んでください。選んだときの向きが水平（0°）になります。</div>
-      <div class="seg" id="axis" role="radiogroup" aria-label="傾きを測る軸">
-        <label><input type="radio" name="axis" value="0"><span>X</span></label>
-        <label><input type="radio" name="axis" value="1"><span>Y</span></label>
-        <label><input type="radio" name="axis" value="2"><span>Z</span></label>
+  <nav class="modes" id="modeTabs" hidden>
+    <button data-mode="tune" aria-pressed="false">角度調整</button>
+    <button data-mode="blackbox" aria-pressed="false">ブラックボックス</button>
+  </nav>
+
+  <!-- ===== 角度調整モード ===== -->
+  <section id="tune" hidden>
+    <div class="card">
+      <div class="live">
+        <div><div class="val" id="board">--</div><div class="lbl">ボードの傾き</div></div>
+        <div><div class="val" id="servo">--</div><div class="lbl">サーボ出力</div></div>
+      </div>
+      <!-- サーボ角に合わせてライダーが傾く -->
+      <div class="rider" aria-hidden="true">
+        <img id="riderImg" src="rider.webp" alt="">
       </div>
     </div>
-    <div class="param">
-      <div class="head"><span class="name">比率</span><span class="num" id="ratioVal">-</span></div>
-      <div class="hint">サーボ角 ＝ ボードの傾き × 比率</div>
-      <input type="range" id="ratio" min="0.1" max="3" step="0.05">
-    </div>
-    <div class="param">
-      <div class="head"><span class="name">最大傾き</span><span class="num" id="limitVal">-</span></div>
-      <div class="hint">サーボがこれ以上は傾かない角度</div>
-      <input type="range" id="limit" min="5" max="90" step="1">
-    </div>
-    <div class="param">
-      <div class="head"><span class="name">センタートリム</span><span class="num" id="trimVal">-</span></div>
-      <div class="hint">ライダーが真っ直ぐになるように微調整</div>
-      <input type="range" id="trim" min="-300" max="300" step="5">
-    </div>
-    <div class="param">
-      <div class="head"><span class="name">不感帯</span><span class="num" id="deadbandVal">-</span></div>
-      <div class="hint">この角度までの傾きは無視する</div>
-      <input type="range" id="deadband" min="0" max="15" step="0.5">
-    </div>
-    <div class="param">
-      <div class="head"><span class="name">なめらかさ</span><span class="num" id="alphaVal">-</span></div>
-      <div class="hint">大きいほど振動に強く、小さいほど反応が速い</div>
-      <input type="range" id="alpha" min="0.5" max="0.995" step="0.005">
-    </div>
-    <div class="param">
-      <div class="head">
-        <span class="name">動きを反転</span>
-        <input type="checkbox" id="reverse">
+
+    <div class="card" id="params">
+      <div class="param" id="axisRow">
+        <div class="head"><span class="name">傾きを測る軸</span><span class="num" id="axisVal">-</span></div>
+        <div class="hint">ボードを傾けても「ボードの傾き」が変わらないときは、別の軸を選んでください。選んだときの向きが水平（0°）になります。</div>
+        <div class="seg" id="axis" role="radiogroup" aria-label="傾きを測る軸">
+          <label><input type="radio" name="axis" value="0"><span>X</span></label>
+          <label><input type="radio" name="axis" value="1"><span>Y</span></label>
+          <label><input type="radio" name="axis" value="2"><span>Z</span></label>
+        </div>
+      </div>
+      <div class="param">
+        <div class="head"><span class="name">比率</span><span class="num" id="ratioVal">-</span></div>
+        <div class="hint">サーボ角 ＝ ボードの傾き × 比率</div>
+        <input type="range" id="ratio" min="0.1" max="3" step="0.05">
+      </div>
+      <div class="param">
+        <div class="head"><span class="name">最大傾き</span><span class="num" id="limitVal">-</span></div>
+        <div class="hint">サーボがこれ以上は傾かない角度</div>
+        <input type="range" id="limit" min="5" max="90" step="1">
+      </div>
+      <div class="param">
+        <div class="head"><span class="name">センタートリム</span><span class="num" id="trimVal">-</span></div>
+        <div class="hint">ライダーが真っ直ぐになるように微調整</div>
+        <input type="range" id="trim" min="-300" max="300" step="5">
+      </div>
+      <div class="param">
+        <div class="head"><span class="name">不感帯</span><span class="num" id="deadbandVal">-</span></div>
+        <div class="hint">この角度までの傾きは無視する</div>
+        <input type="range" id="deadband" min="0" max="15" step="0.5">
+      </div>
+      <div class="param">
+        <div class="head"><span class="name">なめらかさ</span><span class="num" id="alphaVal">-</span></div>
+        <div class="hint">大きいほど振動に強く、小さいほど反応が速い</div>
+        <input type="range" id="alpha" min="0.5" max="0.995" step="0.005">
+      </div>
+      <div class="param">
+        <div class="head">
+          <span class="name">動きを反転</span>
+          <input type="checkbox" id="reverse">
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="card">
-    <p id="dirty" class="dirty" hidden>● 未保存の変更があります</p>
-    <div class="actions">
-      <button id="level">今の傾きを水平にする</button>
-      <button id="defaults">初期値に戻す</button>
-      <button id="save" class="primary wide">本体に保存</button>
+    <div class="card">
+      <p id="dirty" class="dirty" hidden>● 未保存の変更があります</p>
+      <div class="actions">
+        <button id="level">今の傾きを水平にする</button>
+        <button id="defaults">初期値に戻す</button>
+        <button id="save" class="primary wide">本体に保存</button>
+      </div>
+      <p class="note">変更はすぐ反映されますが、「本体に保存」を押さないと電源を切ったときに元に戻ります。</p>
     </div>
-    <p class="note">変更はすぐ反映されますが、「本体に保存」を押さないと電源を切ったときに元に戻ります。</p>
-  </div>
+  </section>
+
+  <!-- ===== ブラックボックスモード ===== -->
+  <section id="blackbox" hidden>
+    <div class="bb-top">
+      <div class="card">
+        <div class="row"><h2 class="grow" style="margin:0">記録</h2><span id="bbState" class="badge">未接続</span></div>
+        <div class="big-time"><span id="bbTime">--:--</span> <small>/ <span id="bbCap">--:--</span></small></div>
+        <div class="bar" id="bbBar"><div></div></div>
+        <div class="kv">
+          <span>サンプル <b id="bbSamples">-</b></span>
+          <span>100Hz・6軸</span>
+          <span id="bbDroppedWrap" hidden>記録もれ <b id="bbDropped">0</b></span>
+        </div>
+        <div class="btns">
+          <button id="bbStart" class="primary">● 記録開始</button>
+          <button id="bbStop">■ 記録停止</button>
+        </div>
+        <p class="note" id="bbNote">記録は本体の電源を切っても残ります。新しく記録を始めると、前の記録は上書きされます。</p>
+      </div>
+
+      <div class="card">
+        <h2>データ</h2>
+        <div class="btns" style="margin-top:0">
+          <button id="bbDownload" class="primary wide">本体からデータを読み込む</button>
+        </div>
+        <div id="bbXfer" hidden>
+          <div class="bar"><div id="bbXferBar"></div></div>
+          <div class="row"><div class="kv grow" id="bbXferText">-</div><button id="bbCancel">中止</button></div>
+        </div>
+        <div class="btns">
+          <button id="bbSave">ファイルに保存</button>
+          <button id="bbOpen">ファイルを開く</button>
+          <button id="bbCsv">CSV で書き出す</button>
+          <button id="bbDemo">デモデータ</button>
+        </div>
+        <input type="file" id="bbFile" accept=".bin,application/octet-stream" hidden>
+        <p class="note" id="bbDataInfo">データがありません</p>
+      </div>
+    </div>
+
+    <div class="card" id="viewer" hidden>
+      <div class="vtabs" id="vTabs">
+        <button data-view="pose" aria-pressed="true">姿勢再生</button>
+        <button data-view="gg">G 3D散布</button>
+        <button data-view="sphere">傾き球</button>
+        <button data-view="ribbon">時間 3D</button>
+        <button data-view="chart">グラフ</button>
+      </div>
+      <div class="stage"><canvas id="vCanvas"></canvas></div>
+      <div class="cams" id="vCams">
+        <button data-cam="rear">後ろ</button>
+        <button data-cam="side">横</button>
+        <button data-cam="front">前</button>
+        <button data-cam="top">上</button>
+        <button data-cam="iso">斜め</button>
+      </div>
+      <div class="timeline">
+        <button id="vPlay" aria-label="再生">▶</button>
+        <input type="range" id="vSlider" min="0" max="0" value="0" step="1" aria-label="再生位置">
+        <span class="t" id="vTime">0.00 / 0.00 s</span>
+        <select id="vSpeed" aria-label="再生速度">
+          <option value="0.25">×0.25</option>
+          <option value="0.5">×0.5</option>
+          <option value="1" selected>×1</option>
+          <option value="2">×2</option>
+          <option value="4">×4</option>
+        </select>
+      </div>
+      <div class="opts">
+        <label id="vYawWrap"><input type="checkbox" id="vYaw">向きの変化（ヨー）も表示</label>
+        <label><input type="checkbox" id="vFlip">前後を反転</label>
+        <label id="vSpanWrap" hidden>表示幅
+          <select id="vSpan">
+            <option value="0">全体</option>
+            <option value="60">60秒</option>
+            <option value="20" selected>20秒</option>
+            <option value="5">5秒</option>
+          </select>
+        </label>
+      </div>
+      <div class="readouts">
+        <div><span>傾き（右+）</span><b id="rLean">-</b></div>
+        <div><span>ピッチ（前上げ+）</span><b id="rPitch">-</b></div>
+        <div><span>ライダー（サーボ角）</span><b id="rRider">-</b></div>
+        <div><span>合計G</span><b id="rTotal">-</b></div>
+        <div><span>前後G（加速+）</span><b id="rLong">-</b></div>
+        <div><span>横G（右+）</span><b id="rLat">-</b></div>
+        <div><span>上下G</span><b id="rVert">-</b></div>
+        <div><span>回転（ロール速度）</span><b id="rRate">-</b></div>
+      </div>
+      <p class="vhelp" id="vHelp"></p>
+    </div>
+  </section>
 </main>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script>
-// UUID は HangOff.ino と同じにすること
-const uuid = n => `a7c3${n}-5b1e-4d6a-9f2e-3c8b1d0e7a51`;
-const SERVICE = uuid('0000');
-
-// 入力欄と BLE キャラクタリスティックの対応
-//   kind: range (スライダー) / check (チェックボックス) / axis (X/Y/Z 選択)
-//   optional: 古いファームウェアには無い項目 (無ければ欄を隠す)
-const AXIS_NAMES = ['X', 'Y', 'Z'];
-const PARAMS = [
-  { id: 'axis',     uuid: uuid('0007'), kind: 'axis', optional: true },
-  { id: 'ratio',    uuid: uuid('0001'), kind: 'range', fmt: v => `× ${v.toFixed(2)}` },
-  { id: 'limit',    uuid: uuid('0002'), kind: 'range', fmt: v => `${v.toFixed(0)}°` },
-  { id: 'trim',     uuid: uuid('0003'), kind: 'range', fmt: v => `${v >= 0 ? '+' : ''}${v.toFixed(0)} µs` },
-  { id: 'deadband', uuid: uuid('0004'), kind: 'range', fmt: v => `${v.toFixed(1)}°` },
-  { id: 'alpha',    uuid: uuid('0005'), kind: 'range', fmt: v => v.toFixed(3) },
-  { id: 'reverse',  uuid: uuid('0006'), kind: 'check' },
-];
-const STATUS_UUID  = uuid('0010');
-const COMMAND_UUID = uuid('0020');
-const RESULT_UUID  = uuid('0021');
-const CMD = { save: 1, level: 2, defaults: 3 };
-const RESULT = { saveOk: 1, saveFail: 2 };
-
-const $ = id => document.getElementById(id);
-let device = null;
-const chars = {};
-
-function setStatus(text, cls = '') {
-  const el = $('status');
-  el.textContent = text;
-  el.className = 'status ' + cls;
-}
-
-function setEnabled(on) {
-  document.querySelectorAll('#params input, .actions button').forEach(el => el.disabled = !on);
-}
-setEnabled(false);
-
-let toastTimer = null;
-function showToast(text, cls = '') {
-  const el = $('toast');
-  el.textContent = text;
-  el.className = 'toast show ' + cls;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.className = 'toast ' + cls, 2500);
-}
-
-// 本体に保存していない変更があるか
-function setDirty(on) {
-  $('dirty').hidden = !on;
-}
-
-const f32 = v => { const b = new DataView(new ArrayBuffer(4)); b.setFloat32(0, v, true); return b.buffer; };
-
-// GATT 操作は同時に1つしかできないので、順番に実行する。
-// 同じ項目の書き込みが溜まったら最新の値だけ送る。
-// 応答が返らない操作があっても後ろが止まらないよう、1つの操作は最大 5 秒で打ち切る。
-let queue = Promise.resolve();
-const pending = new Map();
-const OP_TIMEOUT_MS = 5000;
-
-function withTimeout(promise) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('本体から応答がありません')), OP_TIMEOUT_MS)),
-  ]);
-}
-
-function enqueueWrite(key, fn) {
-  const already = pending.has(key);
-  pending.set(key, fn);
-  if (already) return;
-  queue = queue.then(() => {
-    const job = pending.get(key);
-    pending.delete(key);
-    if (!job) return;
-    return withTimeout(job());
-  }).catch(err => { console.error(err); setStatus('書き込み失敗: ' + err.message, 'err'); });
-}
-
-function resetQueue() {
-  pending.clear();
-  queue = Promise.resolve();
-}
-
-function showValue(p, v) {
-  const input = $(p.id);
-  if (p.kind === 'range') {
-    input.value = v;
-    $(p.id + 'Val').textContent = p.fmt(v);
-  } else if (p.kind === 'check') {
-    input.checked = v >= 0.5;
-  } else if (p.kind === 'axis') {
-    const i = Math.round(v);
-    input.querySelectorAll('input').forEach(r => r.checked = Number(r.value) === i);
-    $('axisVal').textContent = AXIS_NAMES[i] ? `${AXIS_NAMES[i]} 軸` : '-';
-  }
-}
-
-async function readAll() {
-  for (const p of PARAMS) {
-    if (!chars[p.id]) continue;
-    const dv = await chars[p.id].readValue();
-    showValue(p, dv.getFloat32(0, true));
-  }
-}
-
-function onStatus(e) {
-  const dv = e.target.value;
-  const board = dv.getFloat32(0, true);
-  const us = dv.getFloat32(4, true);
-  $('board').textContent = `${board.toFixed(1)}°`;
-  $('servo').textContent = `${us.toFixed(0)} µs`;
-  // 500～2500us → -90～+90°
-  showRiderLean((us - 1500) / 1000 * 90);
-}
-
-// イラストを接地点を中心に回す (+ で右に傾く)
-function showRiderLean(deg) {
-  $('riderImg').style.transform = `rotate(${deg.toFixed(1)}deg)`;
-}
-showRiderLean(0);
-
-// 「接続」ボタン: 一覧から HangOff を選んで接続する
-async function pickAndConnect() {
-  if (!navigator.bluetooth) {
-    setStatus('このブラウザは Bluetooth に対応していません（Android は Chrome、iPhone は Bluefy で開いてください）', 'err');
-    return;
-  }
-  try {
-    setStatus('一覧から HangOff を選んでください…');
-    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE] }] });
-    await connect(dev);
-  } catch (err) {
-    if (err.name === 'NotFoundError') setStatus('未接続');   // 一覧を閉じた
-    else setStatus('接続失敗: ' + err.message, 'err');
-  }
-}
-
-// 前回接続した HangOff に、一覧を出さずに自動でつなぐ (対応ブラウザのみ)
-async function autoConnect() {
-  if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return;
-  let devices;
-  try { devices = await navigator.bluetooth.getDevices(); } catch { return; }
-  const dev = devices.find(d => (d.name || '').startsWith('HangOff')) || devices[0];
-  if (!dev) return;
-
-  setStatus('前回の HangOff を探しています…（電源を入れてください）');
-  if (dev.watchAdvertisements) {
-    // 電波が届いたら接続する
-    const onAdv = () => {
-      dev.removeEventListener('advertisementreceived', onAdv);
-      connect(dev).catch(() => setStatus('未接続'));
-    };
-    dev.addEventListener('advertisementreceived', onAdv);
-    try { await dev.watchAdvertisements(); return; } catch { dev.removeEventListener('advertisementreceived', onAdv); }
-  }
-  try { await connect(dev); } catch { setStatus('未接続'); }
-}
-
-let userDisconnect = false;
-
-async function connect(dev) {
-  if (device !== dev) {
-    if (device) device.removeEventListener('gattserverdisconnected', onDisconnected);
-    device = dev;
-    device.addEventListener('gattserverdisconnected', onDisconnected);
-  }
-  try {
-    setStatus('接続中…');
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(SERVICE);
-    for (const p of PARAMS) {
-      try {
-        chars[p.id] = await service.getCharacteristic(p.uuid);
-      } catch (err) {
-        if (!p.optional) throw err;
-        chars[p.id] = null;
-      }
-    }
-    $('axisRow').hidden = !chars.axis;
-    chars.command = await service.getCharacteristic(COMMAND_UUID);
-    chars.status  = await service.getCharacteristic(STATUS_UUID);
-    // 保存結果の通知 (古いファームウェアには無い)
-    try {
-      chars.result = await service.getCharacteristic(RESULT_UUID);
-      chars.result.addEventListener('characteristicvaluechanged', onResult);
-      await chars.result.startNotifications();
-    } catch { chars.result = null; }
-
-    await readAll();
-    chars.status.addEventListener('characteristicvaluechanged', onStatus);
-    await chars.status.startNotifications();
-
-    setEnabled(true);
-    setStatus(`接続済み: ${device.name || 'HangOff'}`, 'on');
-    $('connect').textContent = '切断';
-  } catch (err) {
-    console.error(err);
-    if (device.gatt.connected) device.gatt.disconnect();
-    throw err;
-  }
-}
-
-async function onDisconnected() {
-  resetQueue();
-  setEnabled(false);
-  $('connect').textContent = '接続';
-  $('board').textContent = '--';
-  $('servo').textContent = '--';
-  if (userDisconnect) { userDisconnect = false; setStatus('切断しました'); return; }
-
-  // 保存時や電波が弱くて切れたときは自動で再接続する
-  for (let i = 1; i <= 5; i++) {
-    setStatus(`切断されました。再接続しています…（${i}/5）`);
-    await new Promise(r => setTimeout(r, 1000));
-    try { await connect(device); return; } catch {}
-  }
-  setStatus('切断されました。「接続」を押してください', 'err');
-}
-
-$('connect').addEventListener('click', () => {
-  if (device && device.gatt.connected) { userDisconnect = true; device.gatt.disconnect(); }
-  else pickAndConnect();
-});
-
-autoConnect();
-
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  navigator.serviceWorker.register('sw.js');
-}
-
-for (const p of PARAMS) {
-  const input = $(p.id);
-  if (p.kind === 'range') {
-    input.addEventListener('input', () => {
-      const v = parseFloat(input.value);
-      $(p.id + 'Val').textContent = p.fmt(v);
-      setDirty(true);
-      enqueueWrite(p.id, () => chars[p.id].writeValueWithResponse(f32(v)));
-    });
-  } else if (p.kind === 'check') {
-    input.addEventListener('change', () => {
-      setDirty(true);
-      enqueueWrite(p.id, () => chars[p.id].writeValueWithResponse(f32(input.checked ? 1 : 0)));
-    });
-  } else if (p.kind === 'axis') {
-    input.addEventListener('change', e => {
-      const i = Number(e.target.value);
-      $('axisVal').textContent = `${AXIS_NAMES[i]} 軸`;
-      setDirty(true);
-      enqueueWrite(p.id, async () => {
-        await chars[p.id].writeValueWithResponse(f32(i));
-        showToast(`${AXIS_NAMES[i]} 軸に切り替え、今の向きを水平にしました`);
-      });
-    });
-  }
-}
-
-// 水平記憶・初期値に戻す (本体側で値が変わるので読み直す)
-function sendCommand(cmd, doneText) {
-  enqueueWrite('cmd' + cmd, async () => {
-    await chars.command.writeValueWithResponse(new Uint8Array([cmd]));
-    await readAll();
-    setDirty(true);
-    showToast(doneText);
-  });
-}
-
-$('level').addEventListener('click', () => sendCommand(CMD.level, '今の傾きを水平にしました'));
-$('defaults').addEventListener('click', () => {
-  if (confirm('設定を初期値に戻しますか？')) sendCommand(CMD.defaults, '初期値に戻しました');
-});
-
-// ---- 保存 ----
-let saveResolve = null;
-
-function onResult(e) {
-  const r = e.target.value.getUint8(0);
-  if (saveResolve) { saveResolve(r); saveResolve = null; }
-}
-
-function setSaveButton(text, cls) {
-  const btn = $('save');
-  btn.textContent = text;
-  btn.classList.remove('ok', 'ng');
-  if (cls) btn.classList.add(cls);
-}
-
-async function save() {
-  const btn = $('save');
-  btn.disabled = true;
-  setSaveButton('保存中…');
-
-  // 本体からの結果通知を待つ (結果通知が無い古いファームウェアなら書き込み完了で成功とみなす)
-  const result = new Promise(resolve => {
-    saveResolve = resolve;
-    setTimeout(() => { if (saveResolve === resolve) { saveResolve = null; resolve('timeout'); } }, 5000);
-  });
-  let written = false;
-  enqueueWrite('save', async () => {
-    await chars.command.writeValueWithResponse(new Uint8Array([CMD.save]));
-    written = true;
-    if (!chars.result && saveResolve) { saveResolve(RESULT.saveOk); saveResolve = null; }
-  });
-
-  const r = await result;
-  if (r === RESULT.saveOk) {
-    setDirty(false);
-    setSaveButton('✓ 保存しました', 'ok');
-    showToast('✓ 本体に保存しました', 'ok');
-  } else if (r === RESULT.saveFail) {
-    setSaveButton('✕ 保存に失敗しました', 'ng');
-    showToast('保存に失敗しました。もう一度押してください', 'ng');
-  } else {
-    setSaveButton('? 確認できませんでした', 'ng');
-    showToast(written ? '保存結果を確認できませんでした' : '本体に届きませんでした。接続を確認してください', 'ng');
-  }
-
-  // 結果表示のあと元に戻す (切断中なら再接続時に有効になる)
-  setTimeout(() => {
-    setSaveButton('本体に保存');
-    btn.disabled = !(device && device.gatt.connected);
-  }, 2000);
-}
-
-$('save').addEventListener('click', save);
-</script>
+<script src="app.js"></script>
+<script src="viewer.js"></script>
+<script src="blackbox.js"></script>
 </body>
 </html>
