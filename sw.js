@@ -1,6 +1,6 @@
 // オフライン(サーキットなど電波のない場所)でも設定画面を開けるようにキャッシュする。
 // キャッシュから即表示し、通信できるときは裏で最新版に更新する。
-const CACHE = 'hangoff-v7';
+const CACHE = 'hangoff-v8';
 const FILES = ['./', './index.html', './app.js', './viewer.js', './blackbox.js',
                './manifest.webmanifest', './icon-192.png', './icon-512.png', './rider.webp'];
 

@@ -194,6 +194,11 @@ async function autoConnect() {
 }
 
 let userDisconnect = false;
+// 本体がわざと切断するとき (記録の準備) は、この時刻まで再接続を続ける
+let reconnectUntil = 0;
+function expectDisconnect(ms) {
+  reconnectUntil = Date.now() + ms;
+}
 
 async function getOptional(service, id) {
   try { return await service.getCharacteristic(id); } catch { return null; }
@@ -251,11 +256,13 @@ async function onDisconnected() {
   if (userDisconnect) { userDisconnect = false; setStatus('切断しました'); return; }
 
   // 保存時や電波が弱くて切れたときは自動で再接続する
-  for (let i = 1; i <= 5; i++) {
-    setStatus(`切断されました。再接続しています…（${i}/5）`);
+  const planned = Date.now() < reconnectUntil;
+  for (let i = 1; i <= 5 || Date.now() < reconnectUntil; i++) {
+    setStatus(planned ? '本体が記録の準備中です。終わったら自動で再接続します…' : `切断されました。再接続しています…（${i}/5）`);
     await new Promise(r => setTimeout(r, 1000));
-    try { await connect(device); return; } catch {}
+    try { await connect(device); reconnectUntil = 0; return; } catch {}
   }
+  reconnectUntil = 0;
   setStatus('切断されました。「接続」を押してください', 'err');
 }
 

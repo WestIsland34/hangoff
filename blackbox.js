@@ -127,9 +127,11 @@ $('bbStart').addEventListener('click', async () => {
   if (st && st.bytes > LOG_HEADER_SIZE &&
       !confirm('本体に前の記録が残っています。新しく記録すると上書きされます。始めますか？\n（必要なら先に「本体からデータを読み込む」で取り出してください）')) return;
   try {
+    // 本体はメモリの消去のために、いったん切断して最大 10 秒ほど止まる
+    expectDisconnect(20000);
     await logCommand([LOGCMD.start]);
-    showToast('記録を始めました');
-  } catch (e) { showToast('記録を始められませんでした', 'ng'); }
+    showToast('記録の準備中です。いったん切断されます（最大10秒）');
+  } catch (e) { reconnectUntil = 0; showToast('記録を始められませんでした', 'ng'); }
 });
 
 $('bbStop').addEventListener('click', async () => {
