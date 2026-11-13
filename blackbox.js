@@ -11,8 +11,8 @@ const LOG_MAGIC = 0x31474C48;   // "HLG1"
 const LOG_HEADER_SIZE = 64;
 const LOG_SAMPLE_SIZE = 12;
 const LOGCMD = { start: 1, stop: 2, read: 3, cancel: 4, probe: 5 };
-const LOG_STATE = { idle: 0, preparing: 1, recording: 2, sending: 3, disabled: 4 };
-const STATE_TEXT = ['待機中', '準備中', '● 記録中', '送信中', '使用不可'];
+const LOG_STATE = { idle: 0, saving: 1, recording: 2, sending: 3, disabled: 4 };
+const STATE_TEXT = ['待機中', '保存中', '● 記録中', '送信中', '使用不可'];
 
 const bb = {
   status: null,       // 本体の記録状態
@@ -65,7 +65,7 @@ function bbUpdateUI() {
   const state = st ? st.state : -1;
   const busy = !!bb.xfer;
   $('bbStart').disabled = !conn || busy || state !== LOG_STATE.idle;
-  $('bbStop').disabled = !conn || !(state === LOG_STATE.recording || state === LOG_STATE.preparing);
+  $('bbStop').disabled = !conn || state !== LOG_STATE.recording;
   $('bbDownload').disabled = !conn || busy || state !== LOG_STATE.idle || !st || st.bytes <= LOG_HEADER_SIZE;
   $('bbSave').disabled = !bb.raw;
   $('bbCsv').disabled = !bb.A;
@@ -127,18 +127,18 @@ $('bbStart').addEventListener('click', async () => {
   if (st && st.bytes > LOG_HEADER_SIZE &&
       !confirm('本体に前の記録が残っています。新しく記録すると上書きされます。始めますか？\n（必要なら先に「本体からデータを読み込む」で取り出してください）')) return;
   try {
-    // 本体はメモリの消去のために、いったん切断して最大 10 秒ほど止まる
-    expectDisconnect(20000);
     await logCommand([LOGCMD.start]);
-    showToast('記録の準備中です。いったん切断されます（最大10秒）');
-  } catch (e) { reconnectUntil = 0; showToast('記録を始められませんでした', 'ng'); }
+    showToast('記録を始めました');
+  } catch (e) { showToast('記録を始められませんでした', 'ng'); }
 });
 
 $('bbStop').addEventListener('click', async () => {
   try {
+    // 本体は記録をフラッシュに書き出すために、いったん切断して数秒止まる
+    expectDisconnect(20000);
     await logCommand([LOGCMD.stop]);
-    showToast('記録を止めました');
-  } catch (e) { showToast('止められませんでした', 'ng'); }
+    showToast('記録を本体に保存中です。いったん切断されます（数秒）');
+  } catch (e) { reconnectUntil = 0; showToast('止められませんでした', 'ng'); }
 });
 
 // ---------------------------------------------------------------------

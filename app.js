@@ -5,7 +5,7 @@
 // =====================================================================
 
 // 画面の版。ファイルを変えたら上げる (sw.js の CACHE も合わせて上げる)
-const APP_VERSION = '1.9';
+const APP_VERSION = '2.0';
 
 const uuid = n => `a7c3${n}-5b1e-4d6a-9f2e-3c8b1d0e7a51`;
 const SERVICE = uuid('0000');
@@ -229,6 +229,11 @@ async function connect(dev) {
     if (chars.result) {
       chars.result.addEventListener('characteristicvaluechanged', onResult);
       await chars.result.startNotifications();
+      // 保存のために本体が切断した後なら、残っている結果を読む
+      if (saveResolve) {
+        const r = (await chars.result.readValue()).getUint8(0);
+        if (r && saveResolve) { saveResolve(r); saveResolve = null; }
+      }
     }
     // ブラックボックス (古いファームウェアには無い)
     chars.logCtrl   = await getOptional(service, LOG_CTRL_UUID);
@@ -322,7 +327,7 @@ let saveResolve = null;
 
 function onResult(e) {
   const r = e.target.value.getUint8(0);
-  if (saveResolve) { saveResolve(r); saveResolve = null; }
+  if (r && saveResolve) { saveResolve(r); saveResolve = null; }   // 0 は「保存を受け付けた」
 }
 
 function setSaveButton(text, cls) {
@@ -337,11 +342,13 @@ async function save() {
   btn.disabled = true;
   setSaveButton('保存中…');
 
-  // 本体からの結果通知を待つ (結果通知が無い古いファームウェアなら書き込み完了で成功とみなす)
+  // 本体は保存のためにいったん切断するので、再接続して結果を読むまで待つ
+  // (結果通知が無い古いファームウェアなら書き込み完了で成功とみなす)
   const result = new Promise(resolve => {
     saveResolve = resolve;
-    setTimeout(() => { if (saveResolve === resolve) { saveResolve = null; resolve('timeout'); } }, 5000);
+    setTimeout(() => { if (saveResolve === resolve) { saveResolve = null; resolve('timeout'); } }, 20000);
   });
+  expectDisconnect(15000);
   let written = false;
   enqueueWrite('save', async () => {
     await chars.command.writeValueWithResponse(new Uint8Array([CMD.save]));
