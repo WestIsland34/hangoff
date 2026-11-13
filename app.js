@@ -4,6 +4,9 @@
 // UUID は HangOff.ino と同じにすること
 // =====================================================================
 
+// 画面の版。ファイルを変えたら上げる (sw.js の CACHE も合わせて上げる)
+const APP_VERSION = '1.9';
+
 const uuid = n => `a7c3${n}-5b1e-4d6a-9f2e-3c8b1d0e7a51`;
 const SERVICE = uuid('0000');
 
@@ -31,6 +34,7 @@ const CMD = { save: 1, level: 2, defaults: 3 };
 const RESULT = { saveOk: 1, saveFail: 2 };
 
 const $ = id => document.getElementById(id);
+$('appVer').textContent = `v${APP_VERSION}`;
 let device = null;
 const chars = {};
 
