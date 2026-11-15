@@ -5,7 +5,7 @@
 // =====================================================================
 
 // 画面の版。ファイルを変えたら上げる (sw.js の CACHE も合わせて上げる)
-const APP_VERSION = '2.5';
+const APP_VERSION = '2.6';
 
 const uuid = n => `a7c3${n}-5b1e-4d6a-9f2e-3c8b1d0e7a51`;
 const SERVICE = uuid('0000');
@@ -38,7 +38,8 @@ const RESULT_UUID  = uuid('0021');
 const LOG_CTRL_UUID   = uuid('0030');
 const LOG_STATUS_UUID = uuid('0031');
 const LOG_DATA_UUID   = uuid('0032');
-const CMD = { save: 1, level: 2, defaults: 3, reference: 4 };
+const CMD = { save: 1, level: 2, defaults: 3, reference: 4, info: 5 };
+const DEBUG_UUID = uuid('0041');   // デバッグモニター (古いファームウェアには無い)
 const RESULT = { saveOk: 1, saveFail: 2, refMoved: 3 };
 
 const $ = id => document.getElementById(id);
@@ -69,7 +70,7 @@ function isConnected() {
 }
 
 function setEnabled(on) {
-  document.querySelectorAll('#params input, #params button, .actions button').forEach(el => el.disabled = !on);
+  document.querySelectorAll('#params input, #params button, .actions button, #dbgInfo').forEach(el => el.disabled = !on);
 }
 setEnabled(false);
 
@@ -95,6 +96,7 @@ function showMode(mode) {
   $('modeTabs').hidden = false;
   $('tune').hidden = mode !== 'tune';
   $('blackbox').hidden = mode !== 'blackbox';
+  $('debug').hidden = false;
   document.body.classList.toggle('wide', mode === 'blackbox');
   document.querySelectorAll('#modeTabs button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
   if (mode === 'blackbox' && typeof bbOnShow === 'function') bbOnShow();
@@ -301,6 +303,15 @@ async function connect(dev) {
     chars.logCtrl   = await getOptional(service, LOG_CTRL_UUID);
     chars.logStatus = await getOptional(service, LOG_STATUS_UUID);
     chars.logData   = await getOptional(service, LOG_DATA_UUID);
+    // デバッグモニター (古いファームウェアには無い)
+    chars.debug = await getOptional(service, DEBUG_UUID);
+    if (chars.debug) {
+      chars.debug.addEventListener('characteristicvaluechanged', onDebug);
+      await chars.debug.startNotifications();
+      $('dbgNote').textContent = '本体からのメッセージ（シリアルモニタと同じ内容）が表示されます。';
+    } else {
+      $('dbgNote').textContent = 'この本体のプログラムはデバッグモニターに対応していません（本体 v2.7 以降が必要）。';
+    }
 
     await readAll();
     chars.status.addEventListener('characteristicvaluechanged', onStatus);
@@ -310,6 +321,8 @@ async function connect(dev) {
     setEnabled(true);
     setStatus(`接続済み: ${device.name || 'HangOff'}`, 'on');
     $('connect').textContent = '切断';
+    dbgAdd('接続しました', true);
+    if (chars.debug) requestInfo();
   } catch (err) {
     console.error(err);
     device.gatt.disconnect();   // 途中の接続も取り消す
@@ -328,6 +341,7 @@ async function onDisconnected() {
   $('servo').textContent = '--';
   $('liveRatio').hidden = true;
   lastPwmUs = 0;
+  dbgAdd('切断されました', true);
   if (typeof bbOnDisconnected === 'function') bbOnDisconnected();
   if (userDisconnect) { userDisconnect = false; setStatus('切断しました'); return; }
 
@@ -516,6 +530,47 @@ async function captureReference() {
 }
 
 $('reference').addEventListener('click', captureReference);
+
+// ---- デバッグモニター ----
+// 本体は 1 行を 20 バイトずつに分けて送ってくる (行の終わりは '\n')。
+// 日本語の文字が途中で切れることがあるので、バイトのままつないでから文字にする。
+const DBG_MAX_LINES = 300;
+const dbgDecoder = new TextDecoder();
+let dbgPartial = '';
+
+function dbgAdd(text, fromApp = false) {
+  const log = $('dbgLog');
+  const d = new Date();
+  const t = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  const line = document.createElement('div');
+  const ts = document.createElement('span');
+  ts.className = 't';
+  ts.textContent = t + ' ';
+  const body = document.createElement('span');
+  if (fromApp) body.className = 'app';
+  body.textContent = fromApp ? `[アプリ] ${text}` : text;
+  line.append(ts, body);
+  log.append(line);
+  while (log.childElementCount > DBG_MAX_LINES) log.firstElementChild.remove();
+  if ($('dbgScroll').checked) log.scrollTop = log.scrollHeight;
+}
+
+function onDebug(e) {
+  const v = e.target.value;
+  dbgPartial += dbgDecoder.decode(new Uint8Array(v.buffer, v.byteOffset, v.byteLength), { stream: true });
+  let i;
+  while ((i = dbgPartial.indexOf('\n')) >= 0) {
+    dbgAdd(dbgPartial.slice(0, i));
+    dbgPartial = dbgPartial.slice(i + 1);
+  }
+}
+
+function requestInfo() {
+  enqueueWrite('info', () => chars.command.writeValueWithResponse(new Uint8Array([CMD.info])));
+}
+
+$('dbgInfo').addEventListener('click', requestInfo);
+$('dbgClear').addEventListener('click', () => { $('dbgLog').textContent = ''; });
 
 // 全部のスクリプトを読み込んでから自動接続を始める
 window.addEventListener('load', () => {
