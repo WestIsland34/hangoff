@@ -144,7 +144,8 @@
   .live-sub { text-align: center; font-size: 14px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
   .live-sub b { color: var(--text); }
   .warn { font-size: 13px; font-weight: 600; color: var(--ng); margin: 0 0 10px; }
-  #pwmGroup .param:first-child { border-top: 1px solid var(--line); padding-top: 10px; }
+  #pwmGroup .param:first-child, #potGroup .param:first-child { border-top: 1px solid var(--line); padding-top: 10px; }
+  .seg.three { grid-template-columns: repeat(3, 1fr); }
 
   .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .actions .wide { grid-column: 1 / -1; }
@@ -344,13 +345,29 @@
       </div>
       <div class="param" id="sourceRow" hidden>
         <div class="head"><span class="name">比率の決め方</span><span class="num" id="sourceVal">-</span></div>
-        <div class="hint">「受信機」にすると、プロポのダイヤルやスイッチで比率を変えられます（受信機の信号を D10 につなぎます）。</div>
+        <div class="hint" id="sourceHint">「受信機」にすると、プロポのダイヤルやスイッチで比率を変えられます（受信機の信号を D10 につなぎます）。</div>
         <div class="seg two" id="source" role="radiogroup" aria-label="比率の決め方">
           <label><input type="radio" name="source" value="0"><span>アプリ</span></label>
-          <label><input type="radio" name="source" value="1"><span>受信機（PWM）</span></label>
+          <label><input type="radio" name="source" value="1"><span>受信機</span></label>
+          <label id="sourcePot" hidden><input type="radio" name="source" value="2"><span>ボリューム</span></label>
         </div>
       </div>
-      <div class="param">
+      <div id="potGroup" hidden>
+        <div class="param">
+          <div class="head"><span class="name">ボリュームの位置</span><span class="num" id="potNow">-</span></div>
+          <div class="hint">左に回し切ると 0%、右に回し切ると 100% です。</div>
+        </div>
+        <div class="param">
+          <div class="head"><span class="name">左に回し切ったときの比率</span><span class="num" id="potRatioLowVal">-</span></div>
+          <input type="range" id="potRatioLow" min="0" max="3" step="0.05">
+        </div>
+        <div class="param">
+          <div class="head"><span class="name">右に回し切ったときの比率</span><span class="num" id="potRatioHighVal">-</span></div>
+          <div class="hint">間は比例して変わります。左右を逆にしたいときは、2つの比率を入れ替えてください。</div>
+          <input type="range" id="potRatioHigh" min="0" max="3" step="0.05">
+        </div>
+      </div>
+      <div class="param" id="ratioRow">
         <div class="head"><span class="name" id="ratioName">比率</span><span class="num" id="ratioVal">-</span></div>
         <div class="hint" id="ratioHint">サーボ角 ＝ ボードの傾き × 比率</div>
         <input type="range" id="ratio" min="0.1" max="3" step="0.05">

@@ -5,7 +5,7 @@
 // =====================================================================
 
 // 画面の版。ファイルを変えたら上げる (sw.js の CACHE も合わせて上げる)
-const APP_VERSION = '2.7';
+const APP_VERSION = '2.8';
 
 const uuid = n => `a7c3${n}-5b1e-4d6a-9f2e-3c8b1d0e7a51`;
 const SERVICE = uuid('0000');
@@ -14,7 +14,8 @@ const SERVICE = uuid('0000');
 //   kind: range (スライダー) / check (チェックボックス) / choice (ボタンで1つ選ぶ)
 //   optional: 古いファームウェアには無い項目 (無ければ欄を隠す)
 const AXIS_NAMES = ['X', 'Y', 'Z'];
-const SOURCE_NAMES = ['アプリ', '受信機'];
+const SOURCE_NAMES = ['アプリ', '受信機', 'ボリューム'];
+const SOURCE = { app: 0, pwm: 1, pot: 2 };
 const usFmt = v => `${v.toFixed(0)} µs`;
 const ratioFmt = v => `× ${v.toFixed(2)}`;
 const PARAMS = [
@@ -25,6 +26,8 @@ const PARAMS = [
   { id: 'pwmRatioHigh', uuid: uuid('000a'), kind: 'range', optional: true, fmt: ratioFmt },
   { id: 'pwmLow',   uuid: uuid('000b'), kind: 'range', optional: true, fmt: usFmt },
   { id: 'pwmHigh',  uuid: uuid('000c'), kind: 'range', optional: true, fmt: usFmt },
+  { id: 'potRatioLow',  uuid: uuid('000d'), kind: 'range', optional: true, fmt: ratioFmt },
+  { id: 'potRatioHigh', uuid: uuid('000e'), kind: 'range', optional: true, fmt: ratioFmt },
   { id: 'limit',    uuid: uuid('0002'), kind: 'range', fmt: v => `${v.toFixed(0)}°` },
   { id: 'trim',     uuid: uuid('0003'), kind: 'range', fmt: v => `${v >= 0 ? '+' : ''}${v.toFixed(0)} µs` },
   { id: 'deadband', uuid: uuid('0004'), kind: 'range', fmt: v => `${v.toFixed(1)}°` },
@@ -32,6 +35,7 @@ const PARAMS = [
   { id: 'reverse',  uuid: uuid('0006'), kind: 'check' },
 ];
 const STATUS_UUID  = uuid('0010');
+const POT_UUID     = uuid('0011');   // ボリュームの位置 0～1 (本体 v2.9 以降)
 const COMMAND_UUID = uuid('0020');
 const RESULT_UUID  = uuid('0021');
 // ブラックボックス (古いファームウェアには無い)
@@ -218,9 +222,20 @@ function showValue(p, v) {
 // 比率の決め方に合わせて、受信機の設定欄を出したり隠したりする
 function updateSourceUI() {
   const hasPwm = !!chars.source;
-  const pwm = hasPwm && Math.round(values.source || 0) === 1;
+  const hasPot = !!chars.potRatioLow;   // ボリュームは本体 v2.9 以降
+  const src = Math.round(values.source || 0);
+  const pwm = hasPwm && src === SOURCE.pwm;
+  const pot = hasPot && src === SOURCE.pot;
   $('sourceRow').hidden = !hasPwm;
+  $('sourcePot').hidden = !hasPot;
+  $('source').classList.toggle('three', hasPot);
+  $('source').classList.toggle('two', !hasPot);
+  $('sourceHint').textContent = hasPot
+    ? '「受信機」はプロポのダイヤルやスイッチ（D10）、「ボリューム」は本体につないだつまみ（A1）で比率を変えます。'
+    : '「受信機」にすると、プロポのダイヤルやスイッチで比率を変えられます（受信機の信号を D10 につなぎます）。';
   $('pwmGroup').hidden = !pwm;
+  $('potGroup').hidden = !pot;
+  $('ratioRow').hidden = pot;   // ボリュームのときは使わない
   $('ratioName').textContent = pwm ? '信号が無いときの比率' : '比率';
   $('ratioHint').textContent = pwm
     ? '受信機の信号が来ていないときは、この比率を使います'
@@ -251,16 +266,26 @@ function onStatus(e) {
     lastPwmUs = dv.getFloat32(8, true);
     const ratio = dv.getFloat32(12, true);
     refValid = dv.getFloat32(16, true) >= 0.5;
-    const pwm = Math.round(values.source || 0) === 1;
+    const src = Math.round(values.source || 0);
     const pwmText = lastPwmUs > 0 ? `${lastPwmUs.toFixed(0)} µs` : '信号なし';
     $('pwmNow').textContent = pwmText;
-    $('liveRatio').innerHTML = `比率 <b>× ${ratio.toFixed(2)}</b>（${pwm ? '受信機 ' + pwmText : 'アプリ'}）`;
+    const from = src === SOURCE.pwm ? '受信機 ' + pwmText
+               : src === SOURCE.pot ? `ボリューム ${potText()}` : 'アプリ';
+    $('liveRatio').innerHTML = `比率 <b>× ${ratio.toFixed(2)}</b>（${from}）`;
     $('liveRatio').hidden = false;
     $('refMissing').hidden = refValid;
   }
 }
 let lastPwmUs = 0;
 let refValid = true;
+
+// ボリュームの位置 (本体 v2.9 以降が 10Hz で送ってくる)
+let lastPot = null;
+const potText = () => lastPot === null ? '-' : `${Math.round(lastPot * 100)}%`;
+function onPot(e) {
+  lastPot = e.target.value.getFloat32(0, true);
+  $('potNow').textContent = potText();
+}
 
 // イラストを接地点を中心に回す (+ で右に傾く)
 function showRiderLean(deg) {
@@ -370,6 +395,11 @@ async function connect(dev) {
     await readAll();
     chars.status.addEventListener('characteristicvaluechanged', onStatus);
     await chars.status.startNotifications();
+    chars.pot = await getOptional(service, POT_UUID);
+    if (chars.pot) {
+      chars.pot.addEventListener('characteristicvaluechanged', onPot);
+      await chars.pot.startNotifications();
+    }
     if (typeof bbOnConnected === 'function') await bbOnConnected();
 
     setEnabled(true);
@@ -395,6 +425,8 @@ async function onDisconnected() {
   $('servo').textContent = '--';
   $('liveRatio').hidden = true;
   lastPwmUs = 0;
+  lastPot = null;
+  $('potNow').textContent = '-';
   dbgAdd('切断されました', true);
   if (typeof bbOnDisconnected === 'function') bbOnDisconnected();
   if (userDisconnect) { userDisconnect = false; setStatus('切断しました'); return; }
