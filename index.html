@@ -140,6 +140,11 @@
   .seg input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
   .seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
   .seg input:disabled + span { opacity: .45; }
+  .seg.two { grid-template-columns: repeat(2, 1fr); }
+  .live-sub { text-align: center; font-size: 14px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .live-sub b { color: var(--text); }
+  .warn { font-size: 13px; font-weight: 600; color: var(--ng); margin: 0 0 10px; }
+  #pwmGroup .param:first-child { border-top: 1px solid var(--line); padding-top: 10px; }
 
   .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .actions .wide { grid-column: 1 / -1; }
@@ -209,7 +214,7 @@
 </head>
 <body>
 <main>
-  <h1>HangOff <span class="ver" id="appVer"></span></h1>
+  <h1>HangOff <span class="ver" id="appVer"></span> <span class="ver" id="fwVer" hidden></span></h1>
 
   <div class="card row">
     <div class="grow">
@@ -242,6 +247,7 @@
         <div><div class="val" id="board">--</div><div class="lbl">ボードの傾き</div></div>
         <div><div class="val" id="servo">--</div><div class="lbl">サーボ出力</div></div>
       </div>
+      <div class="live-sub" id="liveRatio" hidden></div>
       <!-- サーボ角に合わせてライダーが傾く -->
       <div class="rider" aria-hidden="true">
         <img id="riderImg" src="rider.webp" alt="">
@@ -251,17 +257,53 @@
     <div class="card" id="params">
       <div class="param" id="axisRow">
         <div class="head"><span class="name">傾きを測る軸</span><span class="num" id="axisVal">-</span></div>
-        <div class="hint">ボードを傾けても「ボードの傾き」が変わらないときは、別の軸を選んでください。選んだときの向きが水平（0°）になります。</div>
+        <div class="hint">ボードを傾けても「ボードの傾き」が変わらないときは、別の軸を選んでください。</div>
         <div class="seg" id="axis" role="radiogroup" aria-label="傾きを測る軸">
           <label><input type="radio" name="axis" value="0"><span>X</span></label>
           <label><input type="radio" name="axis" value="1"><span>Y</span></label>
           <label><input type="radio" name="axis" value="2"><span>Z</span></label>
         </div>
       </div>
+      <div class="param" id="sourceRow" hidden>
+        <div class="head"><span class="name">比率の決め方</span><span class="num" id="sourceVal">-</span></div>
+        <div class="hint">「受信機」にすると、プロポのダイヤルやスイッチで比率を変えられます（受信機の信号を D10 につなぎます）。</div>
+        <div class="seg two" id="source" role="radiogroup" aria-label="比率の決め方">
+          <label><input type="radio" name="source" value="0"><span>アプリ</span></label>
+          <label><input type="radio" name="source" value="1"><span>受信機（PWM）</span></label>
+        </div>
+      </div>
       <div class="param">
-        <div class="head"><span class="name">比率</span><span class="num" id="ratioVal">-</span></div>
-        <div class="hint">サーボ角 ＝ ボードの傾き × 比率</div>
+        <div class="head"><span class="name" id="ratioName">比率</span><span class="num" id="ratioVal">-</span></div>
+        <div class="hint" id="ratioHint">サーボ角 ＝ ボードの傾き × 比率</div>
         <input type="range" id="ratio" min="0.1" max="3" step="0.05">
+      </div>
+      <div id="pwmGroup" hidden>
+        <div class="param">
+          <div class="head"><span class="name">受信機の信号</span><span class="num" id="pwmNow">-</span></div>
+          <div class="hint">プロポのダイヤルを端まで回して、下のボタンで下限・上限を合わせてください。</div>
+          <div class="btns">
+            <button id="pwmSetLow">今の信号を下限にする</button>
+            <button id="pwmSetHigh">今の信号を上限にする</button>
+          </div>
+        </div>
+        <div class="param">
+          <div class="head"><span class="name">下限のときの比率</span><span class="num" id="pwmRatioLowVal">-</span></div>
+          <div class="hint">信号が下限（<span id="pwmLowEcho">-</span>）のときの比率</div>
+          <input type="range" id="pwmRatioLow" min="0" max="3" step="0.05">
+        </div>
+        <div class="param">
+          <div class="head"><span class="name">上限のときの比率</span><span class="num" id="pwmRatioHighVal">-</span></div>
+          <div class="hint">信号が上限（<span id="pwmHighEcho">-</span>）のときの比率。間は比例して変わります</div>
+          <input type="range" id="pwmRatioHigh" min="0" max="3" step="0.05">
+        </div>
+        <div class="param">
+          <div class="head"><span class="name">信号の下限</span><span class="num" id="pwmLowVal">-</span></div>
+          <input type="range" id="pwmLow" min="800" max="2200" step="10">
+        </div>
+        <div class="param">
+          <div class="head"><span class="name">信号の上限</span><span class="num" id="pwmHighVal">-</span></div>
+          <input type="range" id="pwmHigh" min="800" max="2200" step="10">
+        </div>
       </div>
       <div class="param">
         <div class="head"><span class="name">最大傾き</span><span class="num" id="limitVal">-</span></div>
@@ -293,11 +335,14 @@
 
     <div class="card">
       <p id="dirty" class="dirty" hidden>● 未保存の変更があります</p>
+      <p id="refMissing" class="warn" hidden>基準姿勢がまだ記録されていません。バイクをまっすぐ立てて止め、「基準姿勢を記録」を押してください。</p>
       <div class="actions">
-        <button id="level">今の傾きを水平にする</button>
+        <button id="reference" class="wide" hidden>基準姿勢を記録</button>
+        <button id="level" class="wide">今の傾きを水平にする</button>
         <button id="defaults">初期値に戻す</button>
-        <button id="save" class="primary wide">本体に保存</button>
+        <button id="save" class="primary">本体に保存</button>
       </div>
+      <p class="note" id="refNote" hidden>基準姿勢: バイクをまっすぐ立てて止めた状態で押し、約1秒動かさずに待ちます。そのときの姿勢を 0° とし、ジャイロのゼロ点も測って本体に保存します（そのとき他の設定も一緒に保存されます）。</p>
       <p class="note">変更はすぐ反映されますが、「本体に保存」を押さないと電源を切ったときに元に戻ります。</p>
     </div>
   </section>
