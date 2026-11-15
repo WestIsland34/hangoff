@@ -5,7 +5,7 @@
 // =====================================================================
 
 // 画面の版。ファイルを変えたら上げる (sw.js の CACHE も合わせて上げる)
-const APP_VERSION = '2.6';
+const APP_VERSION = '2.7';
 
 const uuid = n => `a7c3${n}-5b1e-4d6a-9f2e-3c8b1d0e7a51`;
 const SERVICE = uuid('0000');
@@ -47,14 +47,66 @@ $('appVer').textContent = `アプリ v${APP_VERSION}`;
 const VERSION_UUID = uuid('0040');   // 本体のプログラムの版 (古いファームウェアには無い)
 
 // 本体のプログラムの版をタイトル横に出す (切断後も最後に読んだ版を出したままにする)
+let boardFw = null;   // 本体の版 ('2.8' など)。版を送らない古い本体は '2.3' とみなす
 async function readFirmwareVersion(service) {
   const ch = await getOptional(service, VERSION_UUID);
-  let text = '本体 v2.3以前';
+  let ver = null;
   if (ch) {
-    try { text = '本体 v' + new TextDecoder().decode(await ch.readValue()).replace(/\0+$/, ''); } catch {}
+    try { ver = new TextDecoder().decode(await ch.readValue()).replace(/\0+$/, ''); } catch {}
   }
-  $('fwVer').textContent = text;
+  boardFw = ver || '2.3';
+  $('fwVer').textContent = ver ? `本体 v${ver}` : '本体 v2.3以前';
   $('fwVer').hidden = false;
+  updateFwUI();
+}
+
+// ---- 本体のアップデート ----
+// web/firmware/latest.json に最新の版とファイル名がある (tools/build-firmware.ps1 が作る)
+let latestFw = null;
+
+// 版の番号を比べる (a が新しければ正)
+function compareVersion(a, b) {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+async function loadLatestFirmware() {
+  try {
+    const r = await fetch('firmware/latest.json', { cache: 'no-store' });
+    if (r.ok) latestFw = await r.json();
+  } catch {}
+  updateFwUI();
+}
+
+function updateFwUI() {
+  const dl = $('upDownload');
+  $('upBoard').textContent = boardFw ? (boardFw === '2.3' ? 'v2.3以前' : `v${boardFw}`) : '未接続';
+  if (latestFw) {
+    $('upLatest').textContent = `v${latestFw.version}`;
+    dl.href = `firmware/${latestFw.file}`;
+    dl.setAttribute('download', latestFw.file);
+    dl.textContent = `ダウンロード（${latestFw.file}）`;
+    dl.removeAttribute('aria-disabled');
+  } else {
+    $('upLatest').textContent = '-';
+    dl.removeAttribute('href');
+    dl.setAttribute('aria-disabled', 'true');
+    dl.textContent = 'ダウンロード（インターネットにつないで開き直してください）';
+  }
+
+  const st = $('upState');
+  const newer = latestFw && boardFw && compareVersion(latestFw.version, boardFw) > 0;
+  if (!boardFw) { st.textContent = '本体の版を確かめるには「接続」を押してください。'; st.className = 'up-state'; }
+  else if (!latestFw) { st.textContent = ''; st.className = 'up-state'; }
+  else if (newer) { st.textContent = `新しい版 v${latestFw.version} があります。下の手順で書き込んでください。`; st.className = 'up-state new'; }
+  else { st.textContent = '✓ 本体は最新の版です。'; st.className = 'up-state ok'; }
+
+  $('fwNotice').hidden = !newer || !$('update').hidden;
+  if (latestFw) $('fwNoticeVer').textContent = `v${latestFw.version}`;
 }
 let device = null;
 const chars = {};
@@ -96,7 +148,9 @@ function showMode(mode) {
   $('modeTabs').hidden = false;
   $('tune').hidden = mode !== 'tune';
   $('blackbox').hidden = mode !== 'blackbox';
-  $('debug').hidden = false;
+  $('update').hidden = mode !== 'update';
+  $('debug').hidden = mode === 'update';
+  updateFwUI();
   document.body.classList.toggle('wide', mode === 'blackbox');
   document.querySelectorAll('#modeTabs button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
   if (mode === 'blackbox' && typeof bbOnShow === 'function') bbOnShow();
@@ -574,6 +628,7 @@ $('dbgClear').addEventListener('click', () => { $('dbgLog').textContent = ''; })
 
 // 全部のスクリプトを読み込んでから自動接続を始める
 window.addEventListener('load', () => {
+  loadLatestFirmware();
   autoConnect();
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js');

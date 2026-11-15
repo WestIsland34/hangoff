@@ -1,6 +1,6 @@
 // オフライン(サーキットなど電波のない場所)でも設定画面を開けるようにキャッシュする。
 // キャッシュから即表示し、通信できるときは裏で最新版に更新する。
-const CACHE = 'hangoff-v17';   // app.js の APP_VERSION を上げたら一緒に上げる
+const CACHE = 'hangoff-v18';   // app.js の APP_VERSION を上げたら一緒に上げる
 const FILES = ['./', './index.html', './app.js', './viewer.js', './blackbox.js',
                './manifest.webmanifest', './icon-192.png', './icon-512.png', './rider.webp'];
 
@@ -18,6 +18,8 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // 本体のプログラム (firmware/) はキャッシュしない (常に最新の版を見せる)
+  if (new URL(e.request.url).pathname.includes('/firmware/')) return;
   e.respondWith(
     caches.open(CACHE).then(async cache => {
       const cached = await cache.match(e.request, { ignoreSearch: true });

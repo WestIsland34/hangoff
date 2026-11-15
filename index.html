@@ -87,7 +87,7 @@
   }
   .home button b { font-size: 18px; }
   .home button span { font-size: 13px; color: var(--muted); }
-  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
   .modes button { padding: 8px; font-weight: 600; }
   .modes button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 
@@ -196,6 +196,28 @@
   .readouts span { font-size: 11px; color: var(--muted); }
   .vhelp { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
 
+  /* ---- 本体のアップデート ---- */
+  a.button {
+    display: block; text-align: center; text-decoration: none; font-weight: 600;
+    border-radius: 8px; padding: 12px 14px; margin-top: 12px;
+    background: var(--accent); color: var(--accent-text);
+  }
+  a.button[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+  .vers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .vers div { background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+  .vers span { display: block; font-size: 12px; color: var(--muted); }
+  .vers b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .up-state { margin: 10px 0 0; font-weight: 600; }
+  .up-state.new { color: var(--accent); }
+  .up-state.ok { color: var(--ok); }
+  .steps { margin: 0; padding-left: 1.4em; display: grid; gap: 8px; }
+  .steps .hint { display: block; font-size: 12px; color: var(--muted); }
+  .trouble { margin-top: 12px; font-size: 14px; }
+  .trouble summary { cursor: pointer; font-weight: 600; }
+  .trouble ul { margin: 8px 0 0; padding-left: 1.2em; display: grid; gap: 6px; }
+  .notice { border-color: var(--accent); }
+  .notice .grow { font-size: 14px; }
+
   /* ---- デバッグモニター ---- */
   details.card > summary { font-weight: 600; cursor: pointer; }
   .dbg-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; }
@@ -235,6 +257,11 @@
     <button id="connect" class="primary">接続</button>
   </div>
 
+  <div class="card notice row" id="fwNotice" hidden>
+    <div class="grow">新しい本体のプログラム <b id="fwNoticeVer"></b> があります</div>
+    <button data-mode="update">アップデート</button>
+  </div>
+
   <!-- ===== モード選択 (起動直後) ===== -->
   <section id="home" class="home">
     <button data-mode="tune">
@@ -245,12 +272,51 @@
       <b>ブラックボックスモード</b>
       <span>ジャイロと加速度を記録して、走行中の傾きやGを3Dで振り返ります</span>
     </button>
+    <button data-mode="update">
+      <b>本体のアップデート</b>
+      <span>パソコンから本体のプログラムを新しくします（Arduino IDE は不要）</span>
+    </button>
   </section>
 
   <nav class="modes" id="modeTabs" hidden>
     <button data-mode="tune" aria-pressed="false">角度調整</button>
     <button data-mode="blackbox" aria-pressed="false">ブラックボックス</button>
+    <button data-mode="update" aria-pressed="false">アップデート</button>
   </nav>
+
+  <!-- ===== 本体のアップデート ===== -->
+  <section id="update" hidden>
+    <div class="card">
+      <h2>本体のプログラム</h2>
+      <div class="vers">
+        <div><span>本体（接続中）</span><b id="upBoard">-</b></div>
+        <div><span>最新</span><b id="upLatest">-</b></div>
+      </div>
+      <p class="up-state" id="upState"></p>
+      <a class="button primary wide" id="upDownload" href="#" download>ダウンロード</a>
+      <p class="note">パソコン（Windows / Mac）で行います。設定・基準姿勢・記録したデータは消えません。</p>
+    </div>
+
+    <div class="card">
+      <h2>書き込み方</h2>
+      <ol class="steps">
+        <li>上の「ダウンロード」を押して、<b>HangOff-v○○.uf2</b> を保存します。</li>
+        <li>受信機やサーボの電源（5V）を XIAO から外し、XIAO を USB ケーブルでパソコンにつなぎます。<span class="hint">充電専用ではなく、データ通信ができるケーブルを使ってください。</span></li>
+        <li>XIAO の USB 端子の横にある小さなリセットボタン（RST）を、<b>素早く2回</b>押します。<span class="hint">LED がゆっくり明るくなったり暗くなったりし、パソコンに <b>XIAO-SENSE</b> という USB メモリのようなドライブが現れます。</span></li>
+        <li>保存した <b>.uf2</b> ファイルを、そのドライブにドラッグ＆ドロップ（コピー）します。</li>
+        <li>コピーが終わると XIAO が自動で再起動し、ドライブは消えます。<span class="hint">「ディスクが正しく取り出されませんでした」と出ても問題ありません。</span></li>
+        <li>このページで「接続」を押し、上の「本体（接続中）」が最新の版になっていれば完了です。</li>
+      </ol>
+      <details class="trouble">
+        <summary>うまくいかないとき</summary>
+        <ul>
+          <li><b>ドライブが出ない:</b> 2回押す間隔をもっと短くしてみてください。別の USB ケーブルや USB 端子も試してください。</li>
+          <li><b>コピーしても版が変わらない:</b> ドライブが出た状態でコピーしたか確認してください。普通の状態の XIAO には書き込めません。</li>
+          <li><b>スマホしかない:</b> この方法はパソコンが必要です。</li>
+        </ul>
+      </details>
+    </div>
+  </section>
 
   <!-- ===== 角度調整モード ===== -->
   <section id="tune" hidden>
