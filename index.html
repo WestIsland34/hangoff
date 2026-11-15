@@ -196,6 +196,18 @@
   .readouts span { font-size: 11px; color: var(--muted); }
   .vhelp { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
 
+  /* ---- デバッグモニター ---- */
+  details.card > summary { font-weight: 600; cursor: pointer; }
+  .dbg-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; }
+  .dbg-bar label { display: inline-flex; align-items: center; gap: 6px; }
+  .dbg {
+    font-family: ui-monospace, Consolas, "BIZ UDGothic", monospace; font-size: 12px; line-height: 1.45;
+    background: var(--bg); border-radius: 8px; padding: 8px 10px; margin: 10px 0 0;
+    height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .dbg .t { color: var(--muted); }
+  .dbg .app { color: var(--accent); }
+
   .toast {
     position: fixed; left: 50%; bottom: 24px;
     transform: translate(-50%, 20px);
@@ -440,6 +452,18 @@
       <p class="vhelp" id="vHelp"></p>
     </div>
   </section>
+
+  <!-- ===== デバッグモニター (両方のモードで使う) ===== -->
+  <details class="card" id="debug" hidden>
+    <summary>デバッグモニター</summary>
+    <div class="dbg-bar">
+      <button id="dbgInfo">本体の状態を表示</button>
+      <button id="dbgClear">クリア</button>
+      <label><input type="checkbox" id="dbgScroll" checked>自動スクロール</label>
+    </div>
+    <pre id="dbgLog" class="dbg" aria-live="polite"></pre>
+    <p class="note" id="dbgNote">本体からのメッセージ（シリアルモニタと同じ内容）が表示されます。</p>
+  </details>
 </main>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
