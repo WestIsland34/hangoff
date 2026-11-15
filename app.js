@@ -5,7 +5,7 @@
 // =====================================================================
 
 // 画面の版。ファイルを変えたら上げる (sw.js の CACHE も合わせて上げる)
-const APP_VERSION = '2.4';
+const APP_VERSION = '2.5';
 
 const uuid = n => `a7c3${n}-5b1e-4d6a-9f2e-3c8b1d0e7a51`;
 const SERVICE = uuid('0000');
@@ -430,7 +430,7 @@ function setSaveButton(text, cls) {
 }
 
 // 保存を伴うコマンドを送り、結果 (RESULT の値 / 'timeout') を待つ。
-// 本体は保存のためにいったん切断するので、再接続して結果を読むまで待つ
+// v2.4 までの本体は保存のためにいったん切断するので、再接続して結果を読むまで待つ
 // (結果通知が無い古いファームウェアなら書き込み完了で成功とみなす)
 async function commandWithResult(cmd) {
   const result = new Promise(resolve => {
@@ -445,7 +445,8 @@ async function commandWithResult(cmd) {
     if (!chars.result && saveResolve) { saveResolve(RESULT.saveOk); saveResolve = null; }
   });
   const r = await result;
-  if (r === RESULT.refMoved) reconnectUntil = 0;   // 保存しなかったので切断されない
+  // v2.5 以降は接続したまま保存するので、結果が届いたら「わざとの切断」の待ちを終える
+  if (isConnected()) reconnectUntil = 0;
   return { r, written };
 }
 
