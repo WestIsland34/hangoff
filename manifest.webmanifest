@@ -1,7 +1,7 @@
 {
   "name": "HangOff 設定",
   "short_name": "HangOff",
-  "description": "バイクRCのハングオフ角度を Bluetooth で調整する",
+  "description": "マイコンボードの傾きでサーボを動かし、RC バイクのライダーの傾きを制御する。比率は Bluetooth・受信機・ボリュームで調整できる。おまけのブラックボックスで、ジャイロと加速度を記録して走行を3Dで振り返れる",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

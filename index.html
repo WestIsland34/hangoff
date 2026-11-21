@@ -87,6 +87,10 @@
   }
   .home button b { font-size: 18px; }
   .home button span { font-size: 13px; color: var(--muted); }
+  .home .about { font-size: 14px; line-height: 1.7; color: var(--muted); margin-bottom: 4px; }
+  .home .about p { margin: 0 0 6px; }
+  .home .about ul { margin: 0 0 6px; padding-left: 1.3em; }
+  .home .about b { color: var(--text); }
   .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
   .modes button { padding: 8px; font-weight: 600; }
   .modes button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
@@ -265,6 +269,15 @@
 
   <!-- ===== モード選択 (起動直後) ===== -->
   <section id="home" class="home">
+    <div class="about">
+      <p>ジャイロ付きマイコンボードの傾きを検知してサーボを動かし、ライダーの傾きを制御するプロジェクトです。ライダーの傾き角度の比率を調整できます。比率の調整は、次の3つの方法から選べます。</p>
+      <ul>
+        <li><b>Bluetooth</b>：パソコンやスマホから（このページ）</li>
+        <li><b>受信機</b>：チャンネルを割り当てて、送信機から</li>
+        <li><b>ボリューム</b>：マイコンボードにつないだつまみから</li>
+      </ul>
+      <p>おまけの機能として、<b>ブラックボックス</b>を搭載しています。ジャイロと加速度を記録して、走行中の傾きやGを3Dで振り返れます。</p>
+    </div>
     <button data-mode="tune">
       <b>角度調整モード</b>
       <span>ボードの傾きとライダーの傾きの比率などを調整して、本体に保存します</span>
