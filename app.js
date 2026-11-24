@@ -5,7 +5,7 @@
 // =====================================================================
 
 // 画面の版。ファイルを変えたら上げる (sw.js の CACHE も合わせて上げる)
-const APP_VERSION = '2.8';
+const APP_VERSION = '2.9';
 
 const uuid = n => `a7c3${n}-5b1e-4d6a-9f2e-3c8b1d0e7a51`;
 const SERVICE = uuid('0000');
@@ -300,6 +300,7 @@ async function pickAndConnect() {
     setStatus('このブラウザは Bluetooth に対応していません（Android は Chrome、iPhone は Bluefy で開いてください）', 'err');
     return;
   }
+  cancelAutoConnect();   // 自動接続の待ち受けを先に止める
   try {
     setStatus('一覧から HangOff を選んでください…');
     const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE] }] });
@@ -310,23 +311,49 @@ async function pickAndConnect() {
   }
 }
 
+// iPhone (Bluefy) では、電波の待ち受け (watchAdvertisements) の間「接続」ボタンが効かなくなった
+const IS_IOS = /iPhone|iPad|iPod|Bluefy/i.test(navigator.userAgent);
+const AUTO_WAIT_MS = 20000;   // 自動接続で電波を待つ長さ
+let stopAutoWatch = null;     // 自動接続の待ち受けを止める関数
+
+function cancelAutoConnect() {
+  if (stopAutoWatch) { stopAutoWatch(); stopAutoWatch = null; }
+}
+
 // 前回接続した HangOff に、一覧を出さずに自動でつなぐ (対応ブラウザのみ)
 async function autoConnect() {
+  if (IS_IOS) return;   // iPhone では自動接続をしない (「接続」ボタンでつなぐ)
   if (!navigator.bluetooth || !navigator.bluetooth.getDevices) return;
   let devices;
   try { devices = await navigator.bluetooth.getDevices(); } catch { return; }
   const dev = devices.find(d => (d.name || '').startsWith('HangOff')) || devices[0];
-  if (!dev) return;
+  if (!dev || isConnected()) return;
 
-  setStatus('前回の HangOff を探しています…（電源を入れてください）');
+  setStatus('前回の HangOff を探しています…（「接続」でも選べます）');
   if (dev.watchAdvertisements) {
-    // 電波が届いたら接続する
+    // 電波が届いたら接続する。届かなければ、しばらくしてあきらめる
+    const ac = new AbortController();
+    let timer = null;
     const onAdv = () => {
-      dev.removeEventListener('advertisementreceived', onAdv);
+      cancelAutoConnect();
       connect(dev).catch(() => setStatus('未接続'));
     };
+    stopAutoWatch = () => {
+      clearTimeout(timer);
+      dev.removeEventListener('advertisementreceived', onAdv);
+      try { ac.abort(); } catch {}
+    };
     dev.addEventListener('advertisementreceived', onAdv);
-    try { await dev.watchAdvertisements(); return; } catch { dev.removeEventListener('advertisementreceived', onAdv); }
+    try {
+      await dev.watchAdvertisements({ signal: ac.signal });
+      timer = setTimeout(() => {
+        cancelAutoConnect();
+        if (!isConnected()) setStatus('未接続（「接続」を押してください）');
+      }, AUTO_WAIT_MS);
+      return;
+    } catch {
+      cancelAutoConnect();
+    }
   }
   try { await connect(dev); } catch { setStatus('未接続'); }
 }
