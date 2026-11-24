@@ -5,7 +5,7 @@
 // =====================================================================
 
 // 画面の版。ファイルを変えたら上げる (sw.js の CACHE も合わせて上げる)
-const APP_VERSION = '2.9';
+const APP_VERSION = '2.9.1';
 
 const uuid = n => `a7c3${n}-5b1e-4d6a-9f2e-3c8b1d0e7a51`;
 const SERVICE = uuid('0000');
@@ -301,14 +301,36 @@ async function pickAndConnect() {
     return;
   }
   cancelAutoConnect();   // 自動接続の待ち受けを先に止める
+  let dev;
   try {
     setStatus('一覧から HangOff を選んでください…');
-    const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE] }] });
+    dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE] }] });
+  } catch (err) {
+    if (err && err.name === 'NotFoundError') setStatus('未接続');   // 一覧を閉じた
+    else setStatus('一覧から選べませんでした: ' + errText(err), 'err');
+    return;
+  }
+  try {
     await connect(dev);
   } catch (err) {
-    if (err.name === 'NotFoundError') setStatus('未接続');   // 一覧を閉じた
-    else setStatus('接続失敗: ' + err.message, 'err');
+    setStatus('接続失敗: ' + errText(err), 'err');
   }
+}
+
+// エラーの内容を文字にする (Bluefy は message の無いエラーを返すことがある)
+function errText(err) {
+  if (err == null) return '不明なエラー';
+  if (typeof err === 'string') return err;
+  const parts = [err.message, err.name, err.code].filter(v => v !== undefined && v !== null && v !== '');
+  if (parts.length) return parts.join(' / ');
+  try { const s = JSON.stringify(err); if (s && s !== '{}') return s; } catch {}
+  return String(err);
+}
+
+// あると便利だが、無くても動くもの: 失敗しても接続は続ける (デバッグモニターに書く)
+async function optionalStep(label, fn) {
+  try { await fn(); return true; }
+  catch (err) { console.warn(label, err); dbgAdd(`${label} に失敗: ${errText(err)}`, true); return false; }
 }
 
 // iPhone (Bluefy) では、電波の待ち受け (watchAdvertisements) の間「接続」ボタンが効かなくなった
@@ -375,30 +397,38 @@ async function connect(dev) {
     device = dev;
     device.addEventListener('gattserverdisconnected', onDisconnected);
   }
+  // どの段階で失敗したかを、エラーの表示に入れる
+  let step = '';
+  const at = s => { step = s; setStatus(`接続中…（${s}）`); };
   try {
-    setStatus('接続中…');
+    at('つなぐ');
     // 本体が電波を止めているとき、ブラウザによっては接続がいつまでも終わらないので 10 秒で打ち切る
     const server = await Promise.race([
       device.gatt.connect(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('接続がタイムアウトしました')), 10000)),
     ]);
+    at('サービス');
     const service = await server.getPrimaryService(SERVICE);
+    at('設定の項目');
     for (const p of PARAMS) {
       chars[p.id] = p.optional ? await getOptional(service, p.uuid) : await service.getCharacteristic(p.uuid);
     }
     $('axisRow').hidden = !chars.axis;
+    at('本体の版');
     await readFirmwareVersion(service);
     // 基準姿勢の記録は新しいファームウェアだけ (古いものは「今の傾きを水平にする」)
     $('reference').hidden = $('refNote').hidden = !chars.source;
     $('level').hidden = !!chars.source;
     updateSourceUI();
+    at('命令の項目');
     chars.command = await service.getCharacteristic(COMMAND_UUID);
     chars.status  = await service.getCharacteristic(STATUS_UUID);
     // 保存結果の通知 (古いファームウェアには無い)
+    at('保存結果の通知');
     chars.result = await getOptional(service, RESULT_UUID);
     if (chars.result) {
       chars.result.addEventListener('characteristicvaluechanged', onResult);
-      await chars.result.startNotifications();
+      await optionalStep('保存結果の通知', () => chars.result.startNotifications());
       // 保存のために本体が切断した後なら、残っている結果を読む
       if (saveResolve) {
         const r = (await chars.result.readValue()).getUint8(0);
@@ -406,28 +436,36 @@ async function connect(dev) {
       }
     }
     // ブラックボックス (古いファームウェアには無い)
+    at('ブラックボックスの項目');
     chars.logCtrl   = await getOptional(service, LOG_CTRL_UUID);
     chars.logStatus = await getOptional(service, LOG_STATUS_UUID);
     chars.logData   = await getOptional(service, LOG_DATA_UUID);
     // デバッグモニター (古いファームウェアには無い)
+    at('デバッグモニター');
     chars.debug = await getOptional(service, DEBUG_UUID);
+    let debugOn = false;
     if (chars.debug) {
       chars.debug.addEventListener('characteristicvaluechanged', onDebug);
-      await chars.debug.startNotifications();
-      $('dbgNote').textContent = '本体からのメッセージ（シリアルモニタと同じ内容）が表示されます。';
-    } else {
-      $('dbgNote').textContent = 'この本体のプログラムはデバッグモニターに対応していません（本体 v2.7 以降が必要）。';
+      debugOn = await optionalStep('デバッグモニター', () => chars.debug.startNotifications());
     }
+    $('dbgNote').textContent = !chars.debug
+      ? 'この本体のプログラムはデバッグモニターに対応していません（本体 v2.7 以降が必要）。'
+      : debugOn ? '本体からのメッセージ（シリアルモニタと同じ内容）が表示されます。'
+                : 'このブラウザでは本体からのメッセージを受け取れませんでした。';
 
+    at('設定の読み込み');
     await readAll();
+    at('状態の通知');
     chars.status.addEventListener('characteristicvaluechanged', onStatus);
     await chars.status.startNotifications();
+    at('ボリュームの通知');
     chars.pot = await getOptional(service, POT_UUID);
     if (chars.pot) {
       chars.pot.addEventListener('characteristicvaluechanged', onPot);
-      await chars.pot.startNotifications();
+      await optionalStep('ボリュームの通知', () => chars.pot.startNotifications());
     }
-    if (typeof bbOnConnected === 'function') await bbOnConnected();
+    at('ブラックボックスの通知');
+    if (typeof bbOnConnected === 'function') await optionalStep('ブラックボックスの通知', () => bbOnConnected());
 
     setEnabled(true);
     setStatus(`接続済み: ${device.name || 'HangOff'}`, 'on');
@@ -435,9 +473,10 @@ async function connect(dev) {
     dbgAdd('接続しました', true);
     if (chars.debug) requestInfo();
   } catch (err) {
-    console.error(err);
-    device.gatt.disconnect();   // 途中の接続も取り消す
-    throw err;
+    console.error(step, err);
+    dbgAdd(`接続失敗（${step}）: ${errText(err)}`, true);
+    try { device.gatt.disconnect(); } catch {}   // 途中の接続も取り消す
+    throw new Error(`${step}: ${errText(err)}`);
   }
 }
 
