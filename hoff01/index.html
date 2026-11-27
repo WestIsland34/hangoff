@@ -98,6 +98,19 @@
   }
   .sitenav a[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: #fff; }
   @media (prefers-color-scheme: dark) { .sitenav a[aria-current="page"] { color: #15171c; } }
+  /* 電源電圧 (目立たせる) */
+  .volt {
+    border: 2px solid var(--accent); background: var(--accent-soft);
+    border-radius: 12px; padding: 16px 18px; margin: 0 0 14px; text-align: center;
+  }
+  .volt-k { font-size: 14px; font-weight: 600; color: var(--muted); }
+  .volt-v { font-size: 30px; font-weight: 800; line-height: 1.3; margin: 2px 0; }
+  .volt-max {
+    display: inline-block; margin: 4px 0 6px; padding: 2px 12px; border-radius: 999px;
+    background: #c92a2a; color: #fff; font-size: 16px; font-weight: 700;
+  }
+  .volt-s { font-size: 13px; color: var(--muted); }
+  @media (max-width: 560px) { .volt-v { font-size: 26px; } }
 </style>
 <!-- アクセス解析 (GoatCounter: Cookie なし) -->
 <script data-goatcounter="https://westisland.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
@@ -126,6 +139,13 @@
       <img src="HOFF01_B.png" width="1126" height="1557" alt="HOFF01 の裏面。HOFF01 Rev 1.0 の文字と、端子の名前（TX RX BT G、J2 OUT、J1 IN）">
       <figcaption>裏（端子の名前入り）</figcaption>
     </figure>
+  </div>
+
+  <div class="volt" role="note">
+    <div class="volt-k">受信機の電源（サーボ線の + と −）</div>
+    <div class="volt-v">5 〜 8.4 V で使えます</div>
+    <div class="volt-max">12 V を超えると壊れます</div>
+    <div class="volt-s">ふつうの BEC（5〜6 V）・HV の BEC・2 セル LiPo（8.4 V）に対応</div>
   </div>
 
   <div class="specs">
@@ -171,7 +191,7 @@
       </tbody>
     </table>
     <p class="muted" style="margin-top:10px">
-      電源は受信機（BEC）から取ります（最大 8.4 V）。サーボの電源は受信機からそのまま通るので、基板の中の回路を通りません。
+      電源は受信機（BEC）から取ります。<strong>使える電圧は 5〜8.4 V</strong>（ふつうの BEC、HV の BEC、2 セル LiPo）。<strong>12 V を超えると壊れます</strong>（逆差し保護の部品の上限）。サーボの電源は受信機からそのまま通るので、基板の中の回路を通りません。
     </p>
   </section>
 
