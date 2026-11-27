@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<script src="../gate.js?v=1"></script>
+<script src="../gate.js?v=2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HOFF01 — HangOff 専用基板 | にしやん工房</title>
 <meta name="description" content="RC バイクのライダーをボードの傾きに合わせて動かす HangOff の専用基板 HOFF01。20 × 22.5 mm に BLE マイコンと 6 軸センサーを載せ、受信機のサーボ線 1 本で動きます。">
@@ -90,13 +90,24 @@
     .specs { grid-template-columns: 1fr 1fr; }
     table { font-size: 13px; }
   }
+  .sitenav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 16px; }
+  .sitenav a {
+    display: block; text-align: center; text-decoration: none; font-size: 14px; font-weight: 600;
+    padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text);
+  }
+  .sitenav a[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  @media (prefers-color-scheme: dark) { .sitenav a[aria-current="page"] { color: #15171c; } }
 </style>
 <!-- アクセス解析 (GoatCounter: Cookie なし) -->
 <script data-goatcounter="https://westisland.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 <main>
-  <p class="crumb"><a href="../">HangOff</a> › HOFF01</p>
+  <nav class="sitenav" aria-label="ページ">
+    <a href="../">HangOff（今までの版）</a>
+    <a href="./" aria-current="page">HOFF01 専用基板</a>
+  </nav>
   <h1>HOFF01<small>HangOff 専用基板</small></h1>
 
   <p class="lede">

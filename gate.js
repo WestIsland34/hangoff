@@ -13,7 +13,11 @@
   var root = document.documentElement;
   root.style.visibility = 'hidden';
 
-  function norm(s) { return (s.normalize ? s.normalize('NFKC') : s).trim(); }
+  // 全角半角をそろえ (NFKC)、前後の空白を取り、カタカナはひらがなにする
+  function norm(s) {
+    s = (s.normalize ? s.normalize('NFKC') : s).trim();
+    return s.replace(/[ァ-ヶ]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0x60); });
+  }
 
   function sha256hex(s) {
     return crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)).then(function (buf) {
@@ -43,15 +47,20 @@
     box.id = 'hgGate';
     box.innerHTML =
       '<form autocomplete="off"><h1>HangOff</h1><p>合言葉を入れてください</p>' +
-      '<input type="password" aria-label="合言葉" autofocus>' +
+      '<input type="text" aria-label="合言葉" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go">' +
       '<button type="submit">入る</button><div class="err" role="alert"></div></form>';
     document.body.appendChild(box);
 
     var input = box.querySelector('input');
     var err = box.querySelector('.err');
     input.focus();
+    // 日本語入力の変換中の Enter (確定) では送らない。type="password" だと日本語が打てないので普通の欄にした
+    var composing = false;
+    input.addEventListener('compositionstart', function () { composing = true; });
+    input.addEventListener('compositionend', function () { setTimeout(function () { composing = false; }, 0); });
     box.querySelector('form').addEventListener('submit', function (ev) {
       ev.preventDefault();
+      if (composing) return;
       sha256hex(norm(input.value)).then(function (h) {
         if (h === HASH) {
           try { localStorage.setItem(KEY, HASH); } catch (e) {}

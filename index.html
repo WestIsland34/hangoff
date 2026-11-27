@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<script src="gate.js?v=1"></script>
+<script src="gate.js?v=2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HangOff</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -250,6 +250,14 @@
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
   .toast.ok { background: var(--ok); color: #fff; }
   .toast.ng { background: var(--ng); color: #fff; }
+  /* ページの行き来 (今までの版 / HOFF01) */
+  .sitenav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 12px; }
+  .sitenav a {
+    display: block; text-align: center; text-decoration: none; font-size: 14px; font-weight: 600;
+    padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text);
+  }
+  .sitenav a[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 </style>
 <!-- アクセス解析 (GoatCounter: Cookie なし) -->
 <script data-goatcounter="https://westisland.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
@@ -257,6 +265,11 @@
 <body>
 <main>
   <h1>HangOff <span class="ver" id="appVer"></span> <span class="ver" id="fwVer" hidden></span></h1>
+
+  <nav class="sitenav" aria-label="ページ">
+    <a href="./" aria-current="page">HangOff（今までの版）</a>
+    <a href="hoff01/">HOFF01 専用基板</a>
+  </nav>
 
   <div class="card row">
     <div class="grow">
