@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HOFF01 — HangOff 専用基板 | にしやん工房</title>
+<meta name="description" content="RC バイクのライダーをボードの傾きに合わせて動かす HangOff の専用基板 HOFF01。20 × 22.5 mm に BLE マイコンと 6 軸センサーを載せ、受信機のサーボ線 1 本で動きます。">
+<link rel="icon" href="../icon-192.png?v=2">
+<meta name="theme-color" content="#e8590c">
+<meta property="og:title" content="HOFF01 — HangOff 専用基板">
+<meta property="og:description" content="20 × 22.5 mm に BLE マイコンと 6 軸センサー。受信機のサーボ線 1 本で動く HangOff の専用基板。">
+<meta property="og:image" content="https://westisland.jp/hangoff/hoff01/HOFF01_T.png">
+<meta property="og:type" content="article">
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1d2129;
+    --muted: #6b7280;
+    --line: #e2e5ea;
+    --accent: #e8590c;
+    --accent-soft: #fff1e8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15171c;
+      --card: #1f232b;
+      --text: #e8eaed;
+      --muted: #9aa0a9;
+      --line: #323844;
+      --accent: #ff7a2e;
+      --accent-soft: #2b2119;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    line-height: 1.75;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+  .crumb { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+  .crumb a { color: var(--muted); }
+  h1 { font-size: 28px; line-height: 1.3; margin: 0 0 4px; }
+  h1 small { display: block; font-size: 15px; font-weight: 600; color: var(--accent); margin-top: 4px; }
+  .lede { font-size: 16px; margin: 14px 0 20px; }
+  h2 {
+    font-size: 18px; margin: 0 0 10px; padding-left: 10px;
+    border-left: 4px solid var(--accent); line-height: 1.4;
+  }
+  p { margin: 0 0 10px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+  .photos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 14px; }
+  figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 6px; }
+  figcaption { font-size: 13px; color: var(--muted); text-align: center; margin-top: 6px; }
+  .specs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 0 14px; }
+  .spec { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .spec b { display: block; font-size: 20px; line-height: 1.3; }
+  .spec span { font-size: 12px; color: var(--muted); }
+  ul { margin: 0 0 10px; padding-left: 1.3em; }
+  li { margin: 2px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  td.k { white-space: nowrap; font-weight: 600; }
+  .steps { counter-reset: s; list-style: none; padding: 0; }
+  .steps li { counter-increment: s; position: relative; padding-left: 34px; margin: 8px 0; }
+  .steps li::before {
+    content: counter(s); position: absolute; left: 0; top: 1px;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: 13px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  .note { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  a { color: var(--accent); }
+  footer { margin-top: 28px; font-size: 13px; color: var(--muted); text-align: center; }
+  @media (max-width: 560px) {
+    h1 { font-size: 24px; }
+    .specs { grid-template-columns: 1fr 1fr; }
+    table { font-size: 13px; }
+  }
+</style>
+<!-- アクセス解析 (GoatCounter: Cookie なし) -->
+<script data-goatcounter="https://westisland.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<main>
+  <p class="crumb"><a href="../">HangOff</a> › HOFF01</p>
+  <h1>HOFF01<small>HangOff 専用基板</small></h1>
+
+  <p class="lede">
+    RC バイクのライダーを、ボードの傾きに合わせてサーボで「ハングオフ」させる HangOff。
+    これまでは市販のマイコンボード（XIAO nRF52840 Sense）に線をつないで作っていましたが、
+    必要なものを 1 枚にまとめた専用基板 <strong>HOFF01</strong> を設計しました。
+    大きさは 20 × 22.5 mm。受信機のサーボ線を 1 本つなぐだけで動きます。
+  </p>
+
+  <div class="photos">
+    <figure>
+      <img src="HOFF01_T.png" width="1126" height="1552" alt="HOFF01 の表面。上半分に BLE モジュール、右に 6 軸センサー、下にサーボ出力のピンヘッダ">
+      <figcaption>表（部品面）</figcaption>
+    </figure>
+    <figure>
+      <img src="HOFF01_B.png" width="1126" height="1557" alt="HOFF01 の裏面。HOFF01 Rev 1.0 の文字と、端子の名前（TX RX BT G、J2 OUT、J1 IN）">
+      <figcaption>裏（端子の名前入り）</figcaption>
+    </figure>
+  </div>
+
+  <div class="specs">
+    <div class="spec"><b>20 × 22.5</b><span>基板の大きさ (mm)</span></div>
+    <div class="spec"><b>BLE 5</b><span>スマホのアプリで設定</span></div>
+    <div class="spec"><b>6 軸</b><span>ジャイロ + 加速度</span></div>
+    <div class="spec"><b>線 1 本</b><span>受信機から電源と信号</span></div>
+    <div class="spec"><b>5V OK</b><span>受信機の信号を 3.3V に変換</span></div>
+    <div class="spec"><b>逆差し保護</b><span>電源を逆につないでも守る</span></div>
+  </div>
+
+  <section class="card">
+    <h2>なぜ専用基板にしたのか</h2>
+    <p>
+      マイコンボードを使った版は、配線が多く、ライダーの中に収めるのが大変でした。
+      受信機の信号が 5V の場合に備えた部品や、電源の逆差し対策も外付けになります。
+    </p>
+    <p>
+      HOFF01 は、マイコン・センサー・電源・信号の変換をすべて 1 枚に載せました。
+      受信機からのサーボ線を基板に付け、サーボを基板のピンヘッダに挿せば、間に入るだけで動きます。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>しくみ</h2>
+    <ul>
+      <li><strong>傾きを測る</strong>: 6 軸センサー（LSM6DS3TR-C）がボードの傾きを測ります。</li>
+      <li><strong>サーボを動かす</strong>: マイコンが傾きに合わせてサーボの角度を決め、ライダーを傾けます。</li>
+      <li><strong>受信機で調整</strong>: 受信機の空きチャンネルの信号で、傾ける量を走りながら変えられます。</li>
+      <li><strong>スマホで設定</strong>: マイコンは Bluetooth LE 対応の ESP32-H2。スマホのブラウザから設定を変えられます。</li>
+      <li><strong>状態がわかる</strong>: 3 色 LED で、動作の状態を知らせます。</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>つなぎ方</h2>
+    <table>
+      <thead><tr><th>端子</th><th>役目</th><th>並び</th><th>形</th></tr></thead>
+      <tbody>
+        <tr><td class="k">J1 IN</td><td>受信機から（電源と信号）</td><td>S / + / −</td><td>線を直接はんだ付けする穴 (2 mm 間隔)</td></tr>
+        <tr><td class="k">J2 OUT</td><td>サーボへ</td><td>S / + / −</td><td>L 字のピンヘッダ (2.54 mm)</td></tr>
+        <tr><td class="k">J3</td><td>プログラムの書き込み</td><td>TX / RX / BT / G</td><td>線用の穴 (2 mm 間隔)</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="margin-top:10px">
+      電源は受信機（BEC）から取ります（最大 8.4 V）。サーボの電源は受信機からそのまま通るので、基板の中の回路を通りません。
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>主な部品</h2>
+    <table>
+      <thead><tr><th>部品</th><th>型番</th><th>役目</th></tr></thead>
+      <tbody>
+        <tr><td class="k">マイコン</td><td>ESP32-H2-MINI-1</td><td>Bluetooth LE 5.3、アンテナ内蔵のモジュール</td></tr>
+        <tr><td class="k">センサー</td><td>LSM6DS3TR-C</td><td>6 軸（ジャイロ + 加速度）</td></tr>
+        <tr><td class="k">電源</td><td>ME6209A33M3G</td><td>3.3V を作るレギュレーター</td></tr>
+        <tr><td class="k">逆差し保護</td><td>AO3401A</td><td>電源を逆につないだとき回路を切り離す</td></tr>
+        <tr><td class="k">信号の変換</td><td>74LVC1G17</td><td>受信機の 5V の信号を 3.3V に</td></tr>
+        <tr><td class="k">LED</td><td>XL-1615RGBC-RF</td><td>1.6 × 1.5 mm の 3 色 LED</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="margin-top:10px">部品はすべて表面。2 層の基板で、両面を GND で覆っています。</p>
+  </section>
+
+  <section class="card">
+    <h2>プログラムの書き込み</h2>
+    <p>USB は載せず、別に作る USB 変換基板を J3 につないで書き込みます。</p>
+    <ol class="steps">
+      <li>J3 の <strong>BT</strong> と <strong>G</strong> をつないだまま、電源を入れる（書き込みの待ち受けになる）</li>
+      <li>BT と G を外し、TX / RX / G を USB 変換基板につないで書き込む</li>
+      <li>電源を入れ直すと、新しいプログラムで動き出す</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>いまの状態</h2>
+    <p>
+      2026 年 11 月に設計が終わり、試作基板を作るところです。
+      HOFF01 用のプログラムは、これから今の HangOff から移します。
+      動いたら、このページで続きを報告します。
+    </p>
+    <p class="note">
+      設定アプリ（<a href="../">HangOff</a>）は、今はマイコンボード（XIAO nRF52840 Sense）の版に対応しています。
+    </p>
+  </section>
+
+  <footer>
+    <a href="../">HangOff</a> ・ にしやん工房 ・ Designed in Japan
+  </footer>
+</main>
+</body>
+</html>
